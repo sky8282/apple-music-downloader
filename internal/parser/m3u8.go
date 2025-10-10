@@ -307,45 +307,62 @@ func ExtractMedia(b string, more_mode bool) (string, string, string, error) {
 	return streamUrl.String(), qualityForFilename, qualityForDisplay, nil
 }
 
-// ExtractVideo extracts the best video stream URL from a master m3u8
-func ExtractVideo(c string) (string, error) {
+// ExtractVideo extracts the best video stream URL from a master m3u8 and returns resolution info
+func ExtractVideo(c string) (string, string, error) {
 	MediaUrl, err := url.Parse(c)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	resp, err := http.Get(c)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.New(resp.Status)
+		return "", "", errors.New(resp.Status)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	videoString := string(body)
 
 	from, listType, err := m3u8.DecodeFrom(strings.NewReader(videoString), true)
 	if err != nil || listType != m3u8.MASTER {
-		return "", errors.New("m3u8 not of media type")
+		return "", "", errors.New("m3u8 not of media type")
 	}
 	video := from.(*m3u8.MasterPlaylist)
 
 	var streamUrl *url.URL
+	var resolution string
 	sort.Slice(video.Variants, func(i, j int) bool {
 		return video.Variants[i].AverageBandwidth > video.Variants[j].AverageBandwidth
 	})
 
 	maxHeight := *core.Mv_max
+	re := regexp.MustCompile(`_(\d+)x(\d+)`)
+	
 	for _, variant := range video.Variants {
-		re := regexp.MustCompile(`_(\d+)x(\d+)`)
 		matches := re.FindStringSubmatch(variant.URI)
 		if len(matches) == 3 {
+			width, _ := strconv.Atoi(matches[1])
 			height, _ := strconv.Atoi(matches[2])
 			if height <= maxHeight {
 				streamUrl, _ = MediaUrl.Parse(variant.URI)
+				// Determine quality label based on height
+				var qualityLabel string
+				if height >= 2160 {
+					qualityLabel = "4K"
+				} else if height >= 1080 {
+					qualityLabel = "1080P"
+				} else if height >= 720 {
+					qualityLabel = "720P"
+				} else if height >= 480 {
+					qualityLabel = "480P"
+				} else {
+					qualityLabel = fmt.Sprintf("%dP", height)
+				}
+				resolution = fmt.Sprintf("%dx%d (%s)", width, height, qualityLabel)
 				break
 			}
 		}
@@ -354,9 +371,30 @@ func ExtractVideo(c string) (string, error) {
 	if streamUrl == nil {
 		if len(video.Variants) > 0 {
 			streamUrl, _ = MediaUrl.Parse(video.Variants[0].URI)
+			// Try to extract resolution from first variant
+			matches := re.FindStringSubmatch(video.Variants[0].URI)
+			if len(matches) == 3 {
+				width, _ := strconv.Atoi(matches[1])
+				height, _ := strconv.Atoi(matches[2])
+				var qualityLabel string
+				if height >= 2160 {
+					qualityLabel = "4K"
+				} else if height >= 1080 {
+					qualityLabel = "1080P"
+				} else if height >= 720 {
+					qualityLabel = "720P"
+				} else if height >= 480 {
+					qualityLabel = "480P"
+				} else {
+					qualityLabel = fmt.Sprintf("%dP", height)
+				}
+				resolution = fmt.Sprintf("%dx%d (%s)", width, height, qualityLabel)
+			} else {
+				resolution = "未知"
+			}
 		} else {
-			return "", errors.New("no suitable video stream found")
+			return "", "", errors.New("no suitable video stream found")
 		}
 	}
-	return streamUrl.String(), nil
+	return streamUrl.String(), resolution, nil
 }

@@ -18,8 +18,7 @@ import (
 	"errors"
 	"io"
 
-	//"github.com/Eyevinn/mp4ff/mp4"
-	"github.com/itouakirai/mp4ff/mp4"
+	"github.com/Eyevinn/mp4ff/mp4"
 
 	//"io/ioutil"
 	"encoding/json"
@@ -27,7 +26,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	//"time"
+	"time"
 
 	"github.com/grafov/m3u8"
 	"github.com/schollz/progressbar/v3"
@@ -419,7 +418,53 @@ func fileWriter(wg *sync.WaitGroup, segmentsChan <-chan Segment, outputFile io.W
 	}
 }
 
+// getTotalSize 并发获取所有分片的总大小
+func getTotalSize(urls []string, client *http.Client) int64 {
+	var totalSize int64
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// 限制并发数，避免过多HEAD请求
+	semaphore := make(chan struct{}, 10)
+
+	for _, url := range urls {
+		wg.Add(1)
+		go func(u string) {
+			defer wg.Done()
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			req, err := http.NewRequest("HEAD", u, nil)
+			if err != nil {
+				return
+			}
+
+			resp, err := client.Do(req)
+			if err != nil {
+				return
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode == http.StatusOK {
+				size := resp.ContentLength
+				if size > 0 {
+					mu.Lock()
+					totalSize += size
+					mu.Unlock()
+				}
+			}
+		}(url)
+	}
+
+	wg.Wait()
+	return totalSize
+}
+
 func ExtMvData(keyAndUrls string, savePath string) error {
+	return ExtMvDataWithDesc(keyAndUrls, savePath, "")
+}
+
+func ExtMvDataWithDesc(keyAndUrls string, savePath string, description string) error {
 	segments := strings.Split(keyAndUrls, ";")
 	key := segments[0]
 	//fmt.Println(key)
@@ -440,8 +485,43 @@ func ExtMvData(keyAndUrls string, savePath string) error {
 	limiter := make(chan struct{}, maxConcurrency)
 	client := &http.Client{}
 
-	// 初始化进度条
-	bar := progressbar.DefaultBytes(-1, "Downloading...")
+	// 获取总大小：并发发送 HEAD 请求
+	totalSize := getTotalSize(urls, client)
+
+	// 设置描述文本
+	desc := description
+	if desc == "" {
+		desc = "Downloading..."
+	}
+
+	// 初始化进度条（简洁模式：只显示文本信息，不显示图形条）
+	var bar *progressbar.ProgressBar
+	if totalSize > 0 {
+		bar = progressbar.NewOptions64(
+			totalSize,
+			progressbar.OptionSetDescription(desc),
+			progressbar.OptionShowBytes(true),
+			progressbar.OptionShowCount(),
+			progressbar.OptionSetWidth(0), // 0 = 不显示进度条图形
+			progressbar.OptionOnCompletion(func() {
+				fmt.Fprintf(os.Stderr, "\n") // 完成后换行，保留显示
+			}),
+			progressbar.OptionThrottle(100*time.Millisecond),
+		)
+	} else {
+		// 如果无法获取总大小，使用未知大小模式
+		bar = progressbar.NewOptions64(
+			-1,
+			progressbar.OptionSetDescription(desc),
+			progressbar.OptionShowBytes(true),
+			progressbar.OptionShowCount(),
+			progressbar.OptionSetWidth(0), // 0 = 不显示进度条图形
+			progressbar.OptionOnCompletion(func() {
+				fmt.Fprintf(os.Stderr, "\n") // 完成后换行，保留显示
+			}),
+			progressbar.OptionThrottle(100*time.Millisecond),
+		)
+	}
 	barWriter := io.MultiWriter(tempFile, bar)
 
 	// 启动写入 Goroutine
@@ -464,10 +544,9 @@ func ExtMvData(keyAndUrls string, savePath string) error {
 	writerWg.Wait()
 
 	if err := tempFile.Close(); err != nil {
-		
+
 		return err
 	}
-	
 
 	cmd1 := exec.Command("mp4decrypt", "--key", key, tempFile.Name(), filepath.Base(savePath))
 	cmd1.Dir = filepath.Dir(savePath)
