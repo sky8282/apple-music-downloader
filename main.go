@@ -244,7 +244,7 @@ func main() {
 
 	args := pflag.Args()
 	if len(args) == 0 {
-		fmt.Print("请输入专辑链接或TXT文件路径: ")
+		fmt.Print("请输入专辑链接或txt文件路径: ")
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
@@ -286,3 +286,4 @@ func main() {
 		fmt.Println("部分任务在执行过程中出错，请检查上面的日志记录。")
 	}
 }
+
