@@ -17,8 +17,8 @@ import (
 
 	"main/utils/structs"
 
-	//"github.com/Eyevinn/mp4ff/mp4"
-	"github.com/itouakirai/mp4ff/mp4"
+	"github.com/Eyevinn/mp4ff/mp4"
+	//"github.com/itouakirai/mp4ff/mp4"
 	"github.com/fatih/color"
 	"github.com/grafov/m3u8"
 )
