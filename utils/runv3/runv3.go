@@ -18,8 +18,8 @@ import (
 	"errors"
 	"io"
 
-	//"github.com/Eyevinn/mp4ff/mp4"
-	"github.com/itouakirai/mp4ff/mp4"
+	"github.com/Eyevinn/mp4ff/mp4"
+	//"github.com/itouakirai/mp4ff/mp4"
 
 	//"io/ioutil"
 	"encoding/json"
