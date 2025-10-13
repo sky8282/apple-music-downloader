@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -18,12 +19,12 @@ import (
 	"main/utils/structs"
 
 	"github.com/Eyevinn/mp4ff/mp4"
-	//"github.com/itouakirai/mp4ff/mp4"
 	"github.com/fatih/color"
 	"github.com/grafov/m3u8"
 )
 
 const prefetchKey = "skd://itunes.apple.com/P000000000/s1/e1"
+const logicalChunkSize = 10 * 1024 * 1024
 
 type ProgressUpdate struct {
 	Percentage int
@@ -53,58 +54,85 @@ func getRemoteFileSize(fileUrl string, header http.Header) (int64, error) {
 }
 func downloadChunk(wg *sync.WaitGroup, errChan chan error, progressBytes chan int64, fileUrl string, header http.Header, tempFile *os.File, chunkIndex int, start, end int64, Config structs.ConfigSet) {
 	defer wg.Done()
-
-	req, err := http.NewRequest("GET", fileUrl, nil)
-	if err != nil {
-		errChan <- fmt.Errorf("chunk %d: failed to create request: %w", chunkIndex, err)
-		return
-	}
-
-	req.Header = header.Clone()
-	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		errChan <- fmt.Errorf("chunk %d: request failed: %w", chunkIndex, err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusPartialContent {
-
-		if !(chunkIndex > 0 && resp.StatusCode == http.StatusOK) {
-			errChan <- fmt.Errorf("chunk %d: server returned non-206 status: %s", chunkIndex, resp.Status)
-			return
+	maxRetries := 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		req, err := http.NewRequest("GET", fileUrl, nil)
+		if err != nil {
+			if attempt == maxRetries-1 {
+				errChan <- fmt.Errorf("chunk %d: failed to create request: %w", chunkIndex, err)
+			}
+			continue
 		}
-	}
-	
-	buffer := make([]byte, Config.NetworkReadBufferKB*1024)
-	var writtenBytes int64 = 0
-	for {
-		n, readErr := resp.Body.Read(buffer)
-		if n > 0 {
-			_, writeErr := tempFile.WriteAt(buffer[:n], start+writtenBytes)
-			if writeErr != nil {
-				errChan <- fmt.Errorf("chunk %d: failed to write to temp file: %w", chunkIndex, writeErr)
+
+		req.Header = header.Clone()
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
+
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			if attempt == maxRetries-1 {
+				errChan <- fmt.Errorf("chunk %d: request failed: %w", chunkIndex, err)
+			}
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusPartialContent {
+			if !(chunkIndex >= 0 && resp.StatusCode == http.StatusOK) {
+				if attempt == maxRetries-1 {
+					errChan <- fmt.Errorf("chunk %d: server returned non-206 status: %s", chunkIndex, resp.Status)
+				}
+				continue
+			}
+		}
+
+		buffer := make([]byte, Config.NetworkReadBufferKB*1024)
+		var writtenBytes int64 = 0
+		for {
+			n, readErr := resp.Body.Read(buffer)
+			if n > 0 {
+				_, writeErr := tempFile.WriteAt(buffer[:n], start+writtenBytes)
+				if writeErr != nil {
+					if attempt == maxRetries-1 {
+						errChan <- fmt.Errorf("chunk %d: failed to write to temp file: %w", chunkIndex, writeErr)
+					}
+					goto retry
+				}
+				writtenBytes += int64(n)
+				progressBytes <- int64(n)
+			}
+			if readErr == io.EOF {
 				return
 			}
-			writtenBytes += int64(n)
-			progressBytes <- int64(n)
+			if readErr != nil {
+				if attempt == maxRetries-1 {
+					errChan <- fmt.Errorf("chunk %d: failed to read body stream: %w", chunkIndex, readErr)
+				}
+				goto retry
+			}
 		}
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil {
-			errChan <- fmt.Errorf("chunk %d: failed to read body stream: %w", chunkIndex, readErr)
-			return
-		}
+	retry:
+		time.Sleep(2 * time.Second)
 	}
 }
-func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, numChunks int, progressChan chan ProgressUpdate, Config structs.ConfigSet) (*os.File, error) {
-	tempFile, err := os.CreateTemp("", "amdl-*.tmp")
+func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, numChunks int, progressChan chan ProgressUpdate, Config structs.ConfigSet, tempFilePath string) (*os.File, error) {
+	var downloadedSize int64
+	fileInfo, err := os.Stat(tempFilePath)
+	if err == nil {
+		downloadedSize = fileInfo.Size()
+		if downloadedSize >= totalSize {
+			tempFile, err := os.OpenFile(tempFilePath, os.O_RDWR, 0644)
+			if err != nil {
+				return nil, fmt.Errorf("无法打开已完成的临时文件: %w", err)
+			}
+			return tempFile, nil
+		}
+	}
+
+	tempFile, err := os.OpenFile(tempFilePath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file: %w", err)
+		return nil, fmt.Errorf("failed to create/open temp file: %w", err)
 	}
 
 	chunkSize := totalSize / int64(numChunks)
@@ -113,8 +141,8 @@ func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, n
 	progressBytes := make(chan int64, numChunks*10)
 
 	go func() {
-		var totalDownloadedBytes int64
-		var lastReportedBytes int64
+		var totalDownloadedBytes int64 = downloadedSize
+		var lastReportedBytes int64 = downloadedSize
 		ticker := time.NewTicker(500 * time.Millisecond)
 		defer ticker.Stop()
 
@@ -145,6 +173,10 @@ func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, n
 		if i == numChunks-1 {
 			end = totalSize - 1
 		}
+		if end < downloadedSize {
+			continue
+		}
+
 		wg.Add(1)
 		go downloadChunk(&wg, errChan, progressBytes, fileUrl, header, tempFile, i, start, end, Config)
 	}
@@ -155,9 +187,18 @@ func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, n
 
 	for err := range errChan {
 		if err != nil {
-			os.Remove(tempFile.Name())
+			tempFile.Close()
 			return nil, err
 		}
+	}
+	finalInfo, err := tempFile.Stat()
+	if err != nil {
+		tempFile.Close()
+		return nil, fmt.Errorf("下载后无法获取临时文件信息: %w", err)
+	}
+	if finalInfo.Size() != totalSize {
+		tempFile.Close()
+		return nil, fmt.Errorf("下载文件不完整: 预期 %d, 实际 %d", totalSize, finalInfo.Size())
 	}
 
 	return tempFile, nil
@@ -204,43 +245,212 @@ func Run(adamId string, playlistUrl string, outfile string, account *structs.Acc
 		return fmt.Errorf("could not get file size: %w", err)
 	}
 
-	numChunks := Config.ChunkDownloadThreads
-	if numChunks <= 0 {
-		numChunks = 10
-	}
-	tempFile, err := downloadFileInChunks(fileUrlStr, header, totalSize, numChunks, progressChan, Config)
-	if err != nil {
-		return fmt.Errorf("failed to download file in chunks: %w", err)
-	}
-	defer os.Remove(tempFile.Name())
-	tempFile.Close()
-
-	readTempFile, err := os.Open(tempFile.Name())
-	if err != nil {
-		return fmt.Errorf("failed to open temp file for reading: %w", err)
-	}
-	defer readTempFile.Close()
-
 	addr := account.DecryptM3u8Port
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return err
 	}
 	defer Close(conn)
-	err = downloadAndDecryptFile(conn, readTempFile, totalSize, outfile, adamId, segments, Config, progressChan)
+
+	if Config.DownloadMode == 1 {
+		return streamAndDecryptFile(conn, fileUrlStr, header, totalSize, outfile, adamId, segments, Config, progressChan)
+	} else {
+		numChunks := Config.ChunkDownloadThreads
+		if numChunks <= 0 {
+			numChunks = 10
+		}
+		tempFilePath := outfile + ".tmp_download"
+		tempFile, err := downloadFileInChunks(fileUrlStr, header, totalSize, numChunks, progressChan, Config, tempFilePath)
+		if err != nil {
+			return fmt.Errorf("failed to download file in chunks: %w", err)
+		}
+		defer os.Remove(tempFile.Name())
+		tempFile.Close()
+
+		readTempFile, err := os.Open(tempFile.Name())
+		if err != nil {
+			return fmt.Errorf("failed to open temp file for reading: %w", err)
+		}
+		defer readTempFile.Close()
+
+		return downloadAndDecryptFile(conn, readTempFile, totalSize, outfile, adamId, segments, Config, progressChan)
+	}
+}
+
+func streamAndDecryptFile(conn net.Conn, fileUrl string, header http.Header, totalSize int64, outfile string,
+	adamId string, playlistSegments []*m3u8.MediaSegment, Config structs.ConfigSet, progressChan chan ProgressUpdate) error {
+
+	ofh, err := os.Create(outfile)
+	if err != nil {
+		return err
+	}
+	defer ofh.Close()
+	bufferSize := Config.BufferSizeKB * 1024
+	outBuf := bufio.NewWriterSize(ofh, bufferSize)
+	rw := bufio.NewReadWriter(bufio.NewReaderSize(conn, bufferSize), bufio.NewWriterSize(conn, bufferSize))
+
+	initRangeEnd := int64(2 * 1024 * 1024)
+	if initRangeEnd > totalSize {
+		initRangeEnd = totalSize - 1
+	}
+
+	initReq, err := http.NewRequest("GET", fileUrl, nil)
+	if err != nil {
+		return err
+	}
+	initReq.Header = header.Clone()
+	initReq.Header.Set("Range", fmt.Sprintf("bytes=0-%d", initRangeEnd))
+	initResp, err := http.DefaultClient.Do(initReq)
+	if err != nil {
+		return err
+	}
+	initData, err := io.ReadAll(initResp.Body)
+	initResp.Body.Close()
+	if err != nil {
+		return err
+	}
+	initDataReader := bytes.NewReader(initData)
+
+	init, offset, err := ReadInitSegment(initDataReader)
+	if err != nil {
+		return fmt.Errorf("流式读取InitSegment失败: %w", err)
+	}
+	if init == nil {
+		return errors.New("no init segment found")
+	}
+
+	tracks, err := TransformInit(init)
+	if err != nil {
+		return err
+	}
+	err = sanitizeInit(init)
+	if err != nil {
+	}
+	err = init.Encode(outBuf)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	var currentOffset uint64 = offset
+	var lastReportedOffset uint64 = 0
+	lastReportTime := time.Now()
+
+	updateProgress := func(force bool) {
+		if force || time.Since(lastReportTime) > 500*time.Millisecond {
+			elapsedSeconds := time.Since(lastReportTime).Seconds()
+			if elapsedSeconds < 0.1 && !force {
+				return
+			}
+			speed := float64(0)
+			if elapsedSeconds > 0 {
+				speed = float64(currentOffset-lastReportedOffset) / elapsedSeconds
+			}
+
+			lastReportedOffset = currentOffset
+			lastReportTime = time.Now()
+			percentage := int(float64(currentOffset) * 100 / float64(totalSize))
+			if percentage > 100 {
+				percentage = 100
+			}
+			progressChan <- ProgressUpdate{Percentage: percentage, SpeedBPS: speed, Stage: "download"}
+		}
+	}
+
+	segmentIndex := 0
+
+	for currentOffset < uint64(totalSize) {
+		maxRetries := 5
+		var chunkResp *http.Response
+		var chunkErr error
+
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			rangeStart := currentOffset
+			rangeEnd := rangeStart + logicalChunkSize - 1
+			if rangeEnd >= uint64(totalSize) {
+				rangeEnd = uint64(totalSize) - 1
+			}
+
+			chunkReq, err := http.NewRequest("GET", fileUrl, nil)
+			if err != nil {
+				return err
+			}
+			chunkReq.Header = header.Clone()
+			chunkReq.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", rangeStart, rangeEnd))
+
+			client := &http.Client{Timeout: 60 * time.Second}
+			chunkResp, chunkErr = client.Do(chunkReq)
+			if chunkErr == nil && (chunkResp.StatusCode == http.StatusPartialContent || chunkResp.StatusCode == http.StatusOK) {
+				break
+			}
+			if chunkResp != nil {
+				chunkResp.Body.Close()
+			}
+			if attempt < maxRetries-1 {
+				time.Sleep(time.Duration(2+attempt) * time.Second) // 递增等待
+			}
+		}
+
+		if chunkErr != nil {
+			return fmt.Errorf("分块下载失败，偏移: %d, 错误: %w", currentOffset, chunkErr)
+		}
+		defer chunkResp.Body.Close()
+		chunkReader := bufio.NewReaderSize(chunkResp.Body, Config.NetworkReadBufferKB*1024)
+		for {
+			updateProgress(false)
+			frag, nextOffset, err := ReadNextFragment(chunkReader, currentOffset)
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				goto next_chunk
+			}
+			currentOffset = nextOffset
+			if frag == nil {
+				break
+			}
+			if segmentIndex >= len(playlistSegments) {
+				return errors.New("ran out of playlist segments, but more fragments found in file")
+			}
+			segment := playlistSegments[segmentIndex]
+			if segment == nil {
+				return errors.New("segment number out of sync")
+			}
+			key := segment.Key
+			if key != nil {
+				if segmentIndex != 0 {
+					SwitchKeys(rw)
+				}
+				if key.URI == prefetchKey {
+					SendString(rw, "0")
+				} else {
+					SendString(rw, adamId)
+				}
+				SendString(rw, key.URI)
+			}
+			err = DecryptFragment(frag, tracks, rw)
+			if err != nil {
+				return fmt.Errorf("decryptFragment: %w", err)
+			}
+			err = frag.Encode(outBuf)
+			if err != nil {
+				return err
+			}
+			segmentIndex++
+		}
+	next_chunk:
+		chunkResp.Body.Close()
+	}
+
+	updateProgress(true)
+	return outBuf.Flush()
 }
 
 func downloadAndDecryptFile(conn net.Conn, in io.Reader, totalSize int64, outfile string,
 	adamId string, playlistSegments []*m3u8.MediaSegment, Config structs.ConfigSet, progressChan chan ProgressUpdate) error {
 
 	bufferSize := Config.BufferSizeKB * 1024
-
-	ofh, err := os.Create(outfile)
+	finalOutfile := strings.TrimSuffix(outfile, filepath.Ext(outfile)) + ".m4a"
+	ofh, err := os.Create(finalOutfile)
 	if err != nil {
 		return err
 	}
@@ -330,6 +540,12 @@ func downloadAndDecryptFile(conn net.Conn, in io.Reader, totalSize int64, outfil
 	err = outBuf.Flush()
 	if err != nil {
 		return err
+	}
+	if outfile != finalOutfile {
+		err = os.Rename(finalOutfile, outfile)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -437,7 +653,7 @@ func ReadNextFragment(r io.Reader, offset uint64) (*mp4.Fragment, uint64, error)
 		}
 	}
 	if frag.Moof == nil {
-		return nil, offset, fmt.Errorf("more than one mdat box in fragment (box ends @ offset %d)", offset)
+		return nil, offset, nil
 	}
 	return frag, offset, nil
 }
@@ -715,21 +931,29 @@ func RunOrchestrated(adamId string, playlistUrl string, targetStorefront string,
 
 	var lastError error
 
+	progressChan := make(chan ProgressUpdate, 10)
+	go func() {
+		for p := range progressChan {
+			fmt.Printf("\r进度: %s - %d%% (速度: %.2f MB/s)", p.Stage, p.Percentage, p.SpeedBPS/1024/1024)
+		}
+	}()
+
 	for _, acc := range orderedAccounts {
-		fmt.Printf("--------------------------------------------------\n")
+		fmt.Printf("\n--------------------------------------------------\n")
 		fmt.Printf("正在尝试服务: %s (端口: %s, 区域: %s)\n", acc.Name, acc.DecryptM3u8Port, yellow(strings.ToUpper(acc.Storefront)))
-		err := Run(adamId, playlistUrl, outfile, acc, config, nil)
+		err := Run(adamId, playlistUrl, outfile, acc, config, progressChan)
 		if err == nil {
-			fmt.Printf("服务 %s 操作成功！任务完成。\n", acc.Name)
+			fmt.Printf("\n服务 %s 操作成功！任务完成。\n", acc.Name)
+			close(progressChan)
 			return nil
 		}
-		fmt.Printf("警告: 服务 %s 操作失败: %v\n", acc.Name, err)
+		fmt.Printf("\n警告: 服务 %s 操作失败: %v\n", acc.Name, err)
 		lastError = err
 	}
+	close(progressChan)
 
 	fmt.Println("##################################################")
 	fmt.Println("所有可用的服务均尝试失败。")
 	fmt.Println("##################################################")
 	return fmt.Errorf("所有服务均操作失败，最后一次的错误为: %w", lastError)
 }
-
