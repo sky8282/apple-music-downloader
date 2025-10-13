@@ -1,4 +1,5 @@
 package structs
+
 type EditorialNotes struct {
 	Standard string `json:"standard"`
 }
@@ -55,9 +56,10 @@ type ConfigSet struct {
 	DefaultLyricStorefront  string    `yaml:"default-lyric-storefront"`
 	DownloadVideos          bool      `yaml:"download-videos"`
 	FfmpegFix               bool      `yaml:"ffmpeg-fix"`
-    FfmpegCheckArgs         string    `yaml:"ffmpeg-check-args"`
-    FfmpegEncodeArgs        string    `yaml:"ffmpeg-encode-args"`
+	FfmpegCheckArgs         string    `yaml:"ffmpeg-check-args"`
+	FfmpegEncodeArgs        string    `yaml:"ffmpeg-encode-args"`
 	TxtDownloadThreads      int       `yaml:"txtDownloadThreads"`
+	DownloadMode            int       `yaml:"download-mode"`
 }
 
 type Counter struct {
@@ -546,6 +548,3 @@ type SongLyrics struct {
 		} `json:"attributes"`
 	} `json:"data"`
 }
-
-
-
