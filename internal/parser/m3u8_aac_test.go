@@ -57,6 +57,18 @@ func TestParseAACVariantFormat(t *testing.T) {
 			expectedType: "aac",
 			expectedOK:   true,
 		},
+		{
+			name:         "Binaural with 128 bitrate (Pattern 1)",
+			audioString:  "audio-stereo-binaural-128",
+			expectedType: "aac-binaural",
+			expectedOK:   true,
+		},
+		{
+			name:         "Binaural with 128 bitrate (Pattern 2)",
+			audioString:  "audio-stereo-128-binaural",
+			expectedType: "aac-binaural",
+			expectedOK:   true,
+		},
 	}
 
 	for _, tt := range tests {
