@@ -170,8 +170,12 @@ func ExtractMedia(b string, more_mode bool) (string, string, string, error) {
 		if variant.Codecs == "mp4a.40.2" { // AAC
 			hasAAC = true
 			split := strings.Split(variant.Audio, "-")
+			// Handle different AAC formats: standard, binaural, downmix
+			// e.g., "audio-stereo-256", "audio-stereo-binaural-256", "audio-stereo-downmix-256"
 			if len(split) >= 3 {
-				bitrate, _ := strconv.Atoi(split[2])
+				// Get the bitrate from the last part
+				bitrateStr := split[len(split)-1]
+				bitrate, _ := strconv.Atoi(bitrateStr)
 				currentBitrate := 0
 				if aacQuality != "" {
 					fmt.Sscanf(aacQuality, "%d kbps", &currentBitrate)
@@ -249,6 +253,17 @@ func ExtractMedia(b string, more_mode bool) (string, string, string, error) {
 		logger.Debug("Available Audio Formats:")
 		logger.Debug("------------------------")
 		logger.Debug("AAC             : %s", formatAvailability(hasAAC, aacQuality))
+		
+		// Additional AAC variant details for debugging binaural/downmix issues
+		if hasAAC {
+			logger.Debug("AAC Variants Found:")
+			for _, variant := range master.Variants {
+				if variant.Codecs == "mp4a.40.2" {
+					logger.Debug("  - %s", variant.Audio)
+				}
+			}
+		}
+		
 		logger.Debug("Lossless        : %s", formatAvailability(hasLossless, losslessQuality))
 		logger.Debug("Hi-Res Lossless : %s", formatAvailability(hasHiRes, hiResQuality))
 		logger.Debug("Dolby Atmos     : %s", formatAvailability(hasAtmos, atmosQuality))
@@ -276,12 +291,43 @@ func ExtractMedia(b string, more_mode bool) (string, string, string, error) {
 			}
 		} else if core.Dl_aac {
 			if variant.Codecs == "mp4a.40.2" {
-				aacregex := regexp.MustCompile(`audio-stereo-\d+`)
-				replaced := aacregex.ReplaceAllString(variant.Audio, "aac")
-				if replaced == *core.Aac_type {
+				// Fix for aac-binaural and aac-downmix formats:
+				// Apple Music AAC streams can have different naming patterns:
+				// - Standard AAC: "audio-stereo-256" → should match "aac"
+				// - Binaural AAC: "audio-stereo-binaural-256" → should match "aac-binaural"
+				// - Downmix AAC: "audio-stereo-downmix-256" → should match "aac-downmix"
+				//
+				// The previous regex `audio-stereo-\d+` only matched the standard format,
+				// causing binaural/downmix streams to be skipped, leading to bitstream
+				// parsing errors when the wrong variant was selected as fallback.
+				//
+				// New approach: Replace "audio-stereo-" prefix and extract the format type
+				var audioFormat string
+				if strings.HasPrefix(variant.Audio, "audio-stereo-") {
+					// Remove "audio-stereo-" prefix
+					remainder := strings.TrimPrefix(variant.Audio, "audio-stereo-")
+					parts := strings.Split(remainder, "-")
+					
+					if len(parts) >= 2 {
+						// Format: "binaural-256" or "downmix-256"
+						audioFormat = "aac-" + parts[0]
+					} else if len(parts) == 1 {
+						// Format: "256" (standard AAC)
+						audioFormat = "aac"
+					}
+				}
+				
+				if audioFormat == *core.Aac_type {
 					streamUrl, _ = masterUrl.Parse(variant.URI)
 					split := strings.Split(variant.Audio, "-")
-					qualityForFilename = fmt.Sprintf("%s kbps", split[2])
+					// Extract bitrate (last part of the audio string)
+					qualityForFilename = fmt.Sprintf("%s kbps", split[len(split)-1])
+					
+					// Debug logging when debug mode is enabled
+					if core.Debug_mode {
+						logger.Debug("Selected AAC variant: %s (audio: %s, type: %s)", 
+							variant.URI, variant.Audio, *core.Aac_type)
+					}
 					break
 				}
 			}
@@ -299,6 +345,17 @@ func ExtractMedia(b string, more_mode bool) (string, string, string, error) {
 		}
 	}
 	if streamUrl == nil {
+		// Log warning when requested AAC type wasn't found
+		if core.Dl_aac && len(master.Variants) > 0 {
+			logger.Warn("Warning: Requested AAC type '%s' not found in playlist. Available AAC variants:", *core.Aac_type)
+			for _, variant := range master.Variants {
+				if variant.Codecs == "mp4a.40.2" {
+					logger.Warn("  - %s", variant.Audio)
+				}
+			}
+			logger.Warn("Falling back to first available variant. This may cause bitstream parsing errors.")
+		}
+		
 		if len(master.Variants) > 0 {
 			streamUrl, _ = masterUrl.Parse(master.Variants[0].URI)
 		} else {

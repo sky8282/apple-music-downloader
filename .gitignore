@@ -18,6 +18,7 @@
 !START_FROM_FEATURE.md
 !TAG_ERROR_HANDLING.md
 !WORK_REST_CYCLE.md
+!AAC_BINAURAL_DOWNMIX_FIX.md
 !UI_SIMPLIFICATION_REPORT.md
 !utils/*
 !internal/*
@@ -26,6 +27,7 @@
 !internal/progress/*
 !internal/downloader/*
 !internal/core/*
+!internal/parser/*
 !config.yaml
 !config.yaml.example
 !Makefile
