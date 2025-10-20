@@ -26,6 +26,7 @@
 !internal/progress/*
 !internal/downloader/*
 !internal/core/*
+!internal/parser/*
 !config.yaml
 !config.yaml.example
 !Makefile
