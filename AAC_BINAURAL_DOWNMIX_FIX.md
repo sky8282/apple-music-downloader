@@ -11,26 +11,17 @@ most probably the bitstream is malformed (conf, offset 0x180DA)
 ```
 
 **Root Cause:**
-The AAC variant selection logic used a regex pattern `audio-stereo-\d+` that only matched standard AAC format (`audio-stereo-256`). It failed to match binaural and downmix formats which can appear in two different patterns:
-- Pattern 1 (type-bitrate): `audio-stereo-binaural-256`, `audio-stereo-downmix-256`
-- Pattern 2 (bitrate-type): `audio-stereo-256-binaural`, `audio-stereo-256-downmix`
+The AAC variant selection logic used a regex pattern `audio-stereo-\d+` that only matched standard AAC format (`audio-stereo-256`). It failed to match binaural and downmix formats:
+- `audio-stereo-binaural-256`
+- `audio-stereo-downmix-256`
 
 This caused the downloader to fall back to an incompatible variant, resulting in malformed bitstream errors.
 
 ## The Solution
-The fix replaces regex matching with intelligent prefix-based string parsing that correctly handles all AAC format variants and both naming patterns:
-
-**Supported Formats:**
+The fix replaces regex matching with prefix-based string parsing that correctly handles all AAC format variants:
 1. Standard AAC: `audio-stereo-256` → matches `aac`
-2. Binaural AAC (Pattern 1): `audio-stereo-binaural-256` → matches `aac-binaural`
-3. Binaural AAC (Pattern 2): `audio-stereo-256-binaural` → matches `aac-binaural`
-4. Downmix AAC (Pattern 1): `audio-stereo-downmix-256` → matches `aac-downmix`
-5. Downmix AAC (Pattern 2): `audio-stereo-256-downmix` → matches `aac-downmix`
-
-**Pattern Detection:**
-The parser intelligently detects the pattern by checking if the first part after "audio-stereo-" is numeric:
-- If numeric (e.g., "256-binaural"): Extract format type from the end
-- If non-numeric (e.g., "binaural-256"): Extract format type from the beginning
+2. Binaural AAC: `audio-stereo-binaural-256` → matches `aac-binaural`
+3. Downmix AAC: `audio-stereo-downmix-256` → matches `aac-downmix`
 
 ## How to Validate
 
@@ -157,29 +148,18 @@ if replaced == *core.Aac_type {
 
 With:
 ```go
-// New (fixed) code - supports both patterns
+// New (fixed) code
 var audioFormat string
 if strings.HasPrefix(variant.Audio, "audio-stereo-") {
     remainder := strings.TrimPrefix(variant.Audio, "audio-stereo-")
     parts := strings.Split(remainder, "-")
     
-    if len(parts) == 1 {
+    if len(parts) >= 2 {
+        // Format: "binaural-256" or "downmix-256"
+        audioFormat = "aac-" + parts[0]
+    } else if len(parts) == 1 {
         // Format: "256" (standard AAC)
         audioFormat = "aac"
-    } else if len(parts) >= 2 {
-        // Check both patterns:
-        // Pattern 1: "binaural-256" or "downmix-256"
-        // Pattern 2: "256-binaural" or "256-downmix"
-        
-        // Try to parse first part as bitrate to detect pattern
-        if _, err := strconv.Atoi(parts[0]); err == nil && len(parts) >= 2 {
-            // Pattern 2: bitrate comes first, format type is last
-            formatType := parts[len(parts)-1]
-            audioFormat = "aac-" + formatType
-        } else {
-            // Pattern 1: format type comes first
-            audioFormat = "aac-" + parts[0]
-        }
     }
 }
 

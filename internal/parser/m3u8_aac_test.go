@@ -1,8 +1,6 @@
 package parser
 
 import (
-	"strconv"
-	"strings"
 	"testing"
 )
 
@@ -22,26 +20,14 @@ func TestParseAACVariantFormat(t *testing.T) {
 			expectedOK:   true,
 		},
 		{
-			name:         "Binaural AAC format (Pattern 1: type-bitrate)",
+			name:         "Binaural AAC format",
 			audioString:  "audio-stereo-binaural-256",
 			expectedType: "aac-binaural",
 			expectedOK:   true,
 		},
 		{
-			name:         "Binaural AAC format (Pattern 2: bitrate-type)",
-			audioString:  "audio-stereo-256-binaural",
-			expectedType: "aac-binaural",
-			expectedOK:   true,
-		},
-		{
-			name:         "Downmix AAC format (Pattern 1: type-bitrate)",
+			name:         "Downmix AAC format",
 			audioString:  "audio-stereo-downmix-256",
-			expectedType: "aac-downmix",
-			expectedOK:   true,
-		},
-		{
-			name:         "Downmix AAC format (Pattern 2: bitrate-type)",
-			audioString:  "audio-stereo-256-downmix",
 			expectedType: "aac-downmix",
 			expectedOK:   true,
 		},
@@ -57,18 +43,6 @@ func TestParseAACVariantFormat(t *testing.T) {
 			expectedType: "aac",
 			expectedOK:   true,
 		},
-		{
-			name:         "Binaural with 128 bitrate (Pattern 1)",
-			audioString:  "audio-stereo-binaural-128",
-			expectedType: "aac-binaural",
-			expectedOK:   true,
-		},
-		{
-			name:         "Binaural with 128 bitrate (Pattern 2)",
-			audioString:  "audio-stereo-128-binaural",
-			expectedType: "aac-binaural",
-			expectedOK:   true,
-		},
 	}
 
 	for _, tt := range tests {
@@ -77,28 +51,29 @@ func TestParseAACVariantFormat(t *testing.T) {
 			var audioFormat string
 			var ok bool
 			
-			if strings.HasPrefix(tt.audioString, "audio-stereo-") {
-				remainder := strings.TrimPrefix(tt.audioString, "audio-stereo-")
-				parts := strings.Split(remainder, "-")
+			if len(tt.audioString) > 0 && tt.audioString[:13] == "audio-stereo-" {
+				remainder := tt.audioString[13:] // Remove "audio-stereo-" prefix
+				parts := make([]string, 0)
+				lastIdx := 0
+				for i, ch := range remainder {
+					if ch == '-' {
+						if i > lastIdx {
+							parts = append(parts, remainder[lastIdx:i])
+						}
+						lastIdx = i + 1
+					}
+				}
+				if lastIdx < len(remainder) {
+					parts = append(parts, remainder[lastIdx:])
+				}
 				
-				if len(parts) == 1 {
+				if len(parts) >= 2 {
+					// Format: "binaural-256" or "downmix-256"
+					audioFormat = "aac-" + parts[0]
+					ok = true
+				} else if len(parts) == 1 {
 					// Format: "256" (standard AAC)
 					audioFormat = "aac"
-					ok = true
-				} else if len(parts) >= 2 {
-					// Check both patterns:
-					// Pattern 1: "binaural-256" or "downmix-256"
-					// Pattern 2: "256-binaural" or "256-downmix"
-					
-					// Try to parse first part as bitrate to detect pattern
-					if _, err := strconv.Atoi(parts[0]); err == nil && len(parts) >= 2 {
-						// Pattern 2: bitrate comes first, format type is last
-						formatType := parts[len(parts)-1]
-						audioFormat = "aac-" + formatType
-					} else {
-						// Pattern 1: format type comes first
-						audioFormat = "aac-" + parts[0]
-					}
 					ok = true
 				}
 			}
@@ -127,38 +102,37 @@ func TestExtractBitrateFromAudioString(t *testing.T) {
 			expectedBitrate: "256",
 		},
 		{
-			name:            "Binaural AAC (Pattern 1: type-bitrate)",
+			name:            "Binaural AAC",
 			audioString:     "audio-stereo-binaural-256",
 			expectedBitrate: "256",
 		},
 		{
-			name:            "Binaural AAC (Pattern 2: bitrate-type)",
-			audioString:     "audio-stereo-256-binaural",
-			expectedBitrate: "256",
-		},
-		{
-			name:            "Downmix AAC (Pattern 1: type-bitrate)",
+			name:            "Downmix AAC",
 			audioString:     "audio-stereo-downmix-128",
-			expectedBitrate: "128",
-		},
-		{
-			name:            "Downmix AAC (Pattern 2: bitrate-type)",
-			audioString:     "audio-stereo-128-downmix",
 			expectedBitrate: "128",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Split and find the numeric part (same as in the fix)
-			parts := strings.Split(tt.audioString, "-")
+			// Split and get last part (same as in the fix)
+			parts := make([]string, 0)
+			lastIdx := 0
+			for i, ch := range tt.audioString {
+				if ch == '-' {
+					if i > lastIdx {
+						parts = append(parts, tt.audioString[lastIdx:i])
+					}
+					lastIdx = i + 1
+				}
+			}
+			if lastIdx < len(tt.audioString) {
+				parts = append(parts, tt.audioString[lastIdx:])
+			}
 			
 			var bitrate string
-			for _, part := range parts {
-				if _, err := strconv.Atoi(part); err == nil {
-					bitrate = part
-					break
-				}
+			if len(parts) > 0 {
+				bitrate = parts[len(parts)-1]
 			}
 			
 			if bitrate != tt.expectedBitrate {

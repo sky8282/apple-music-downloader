@@ -294,64 +294,39 @@ func ExtractMedia(b string, more_mode bool) (string, string, string, error) {
 				// Fix for aac-binaural and aac-downmix formats:
 				// Apple Music AAC streams can have different naming patterns:
 				// - Standard AAC: "audio-stereo-256" → should match "aac"
-				// - Binaural AAC (Pattern 1): "audio-stereo-binaural-256" → should match "aac-binaural"
-				// - Binaural AAC (Pattern 2): "audio-stereo-256-binaural" → should match "aac-binaural"
-				// - Downmix AAC (Pattern 1): "audio-stereo-downmix-256" → should match "aac-downmix"
-				// - Downmix AAC (Pattern 2): "audio-stereo-256-downmix" → should match "aac-downmix"
+				// - Binaural AAC: "audio-stereo-binaural-256" → should match "aac-binaural"
+				// - Downmix AAC: "audio-stereo-downmix-256" → should match "aac-downmix"
 				//
 				// The previous regex `audio-stereo-\d+` only matched the standard format,
 				// causing binaural/downmix streams to be skipped, leading to bitstream
 				// parsing errors when the wrong variant was selected as fallback.
 				//
-				// New approach: Parse the audio string to detect format type and bitrate
+				// New approach: Replace "audio-stereo-" prefix and extract the format type
 				var audioFormat string
 				if strings.HasPrefix(variant.Audio, "audio-stereo-") {
 					// Remove "audio-stereo-" prefix
 					remainder := strings.TrimPrefix(variant.Audio, "audio-stereo-")
 					parts := strings.Split(remainder, "-")
 					
-					if len(parts) == 1 {
+					if len(parts) >= 2 {
+						// Format: "binaural-256" or "downmix-256"
+						audioFormat = "aac-" + parts[0]
+					} else if len(parts) == 1 {
 						// Format: "256" (standard AAC)
 						audioFormat = "aac"
-					} else if len(parts) >= 2 {
-						// Check both patterns:
-						// Pattern 1: "binaural-256" or "downmix-256"
-						// Pattern 2: "256-binaural" or "256-downmix"
-						
-						// Try to parse first part as bitrate to detect pattern
-						if _, err := strconv.Atoi(parts[0]); err == nil && len(parts) >= 2 {
-							// Pattern 2: bitrate comes first, format type is last
-							formatType := parts[len(parts)-1]
-							audioFormat = "aac-" + formatType
-						} else {
-							// Pattern 1: format type comes first
-							audioFormat = "aac-" + parts[0]
-						}
 					}
 				}
 				
 				if audioFormat == *core.Aac_type {
 					streamUrl, _ = masterUrl.Parse(variant.URI)
 					split := strings.Split(variant.Audio, "-")
-					
-					// Extract bitrate - try to find the numeric part
-					var bitrate string
-					for _, part := range split {
-						if _, err := strconv.Atoi(part); err == nil {
-							bitrate = part
-							break
-						}
-					}
-					if bitrate == "" {
-						// Fallback: use last part
-						bitrate = split[len(split)-1]
-					}
-					qualityForFilename = fmt.Sprintf("%s kbps", bitrate)
+					// Extract bitrate (last part of the audio string)
+					qualityForFilename = fmt.Sprintf("%s kbps", split[len(split)-1])
 					
 					// Debug logging when debug mode is enabled
 					if core.Debug_mode {
-						logger.Debug("Selected AAC variant: %s (audio: %s, type: %s, bitrate: %s)", 
-							variant.URI, variant.Audio, *core.Aac_type, bitrate)
+						logger.Debug("Selected AAC variant: %s (audio: %s, type: %s)", 
+							variant.URI, variant.Audio, *core.Aac_type)
 					}
 					break
 				}
