@@ -24,6 +24,7 @@ func GetToken() (string, error) {
 	}
 
 	//regex := regexp.MustCompile(`/assets/index-legacy-[^/]+\.js`)
+	//修复正则匹配.js
 	regex := regexp.MustCompile(`/assets/index-legacy[-~][^/]+\.js`)
 	indexJsUri := regex.FindString(string(body))
 
@@ -48,4 +49,5 @@ func GetToken() (string, error) {
 
 	return token, nil
 }
+
 
