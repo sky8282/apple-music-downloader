@@ -351,7 +351,9 @@ func GetToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	regex := regexp.MustCompile(`/assets/index-legacy-[^/]+\.js`)
+	//regex := regexp.MustCompile(`/assets/index-legacy-[^/]+\.js`)
+	//修复正则匹配
+	regex := regexp.MustCompile(`/assets/index-legacy[-~][^/]+\.js`)
 	indexJsUri := regex.FindString(string(body))
 	if indexJsUri == "" {
 		return "", errors.New("could not find JS asset URL in HTML")
