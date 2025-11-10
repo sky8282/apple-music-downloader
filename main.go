@@ -17,6 +17,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
+var jsonOutput bool
+
 func handleSingleMV(urlRaw string) {
 	if core.Debug_mode {
 		return
@@ -87,7 +89,7 @@ func processURL(urlRaw string, wg *sync.WaitGroup, semaphore chan struct{}, curr
 		defer func() { <-semaphore }()
 	}
 
-	if totalTasks > 1 {
+	if totalTasks > 1 && !jsonOutput {
 		fmt.Printf("[%d/%d] 开始处理: %s\n", currentTask, totalTasks, urlRaw)
 	}
 
@@ -129,12 +131,13 @@ func processURL(urlRaw string, wg *sync.WaitGroup, semaphore chan struct{}, curr
 		log.Printf("解析URL失败 %s: %v", urlRaw, err)
 		return
 	}
-	var urlArg_i = parse.Query().Get("i")
-	err = downloader.Rip(albumId, storefront, urlArg_i, urlRaw)
+	var urlArg_i = parse.Query().Get("i")	
+	err = downloader.Rip(albumId, storefront, urlArg_i, urlRaw, jsonOutput)
+	
 	if err != nil {
 		fmt.Printf("专辑下载失败: %s -> %v\n", urlRaw, err)
 	} else {
-		if totalTasks > 1 {
+		if totalTasks > 1 && !jsonOutput {
 			fmt.Printf("[%d/%d] 任务完成: %s\n", currentTask, totalTasks, urlRaw)
 		}
 	}
@@ -145,6 +148,11 @@ func runDownloads(initialUrls []string, isBatch bool) {
 
 	for _, urlRaw := range initialUrls {
 		if strings.Contains(urlRaw, "/artist/") {
+			if jsonOutput {
+				fmt.Printf("JSON 模式下不支持艺术家页面解析: %s\n", urlRaw)
+				continue
+			}
+
 			fmt.Printf("正在解析歌手页面: %s\n", urlRaw)
 			artistAccount := &core.Config.Accounts[0]
 			urlArtistName, urlArtistID, err := api.GetUrlArtistName(urlRaw, artistAccount)
@@ -179,7 +187,9 @@ func runDownloads(initialUrls []string, isBatch bool) {
 	}
 
 	if len(finalUrls) == 0 {
-		fmt.Println("队列中没有有效的链接可供下载。")
+		if !jsonOutput {
+			fmt.Println("队列中没有有效的链接可供下载。")
+		}
 		return
 	}
 
@@ -192,8 +202,10 @@ func runDownloads(initialUrls []string, isBatch bool) {
 	semaphore := make(chan struct{}, numThreads)
 	totalTasks := len(finalUrls)
 
-	fmt.Printf("--- 开始下载任务 ---\n总数: %d, 并发数: %d\n--------------------\n", totalTasks, numThreads)
-
+	if !jsonOutput {
+		fmt.Printf("--- 开始下载任务 ---\n总数: %d, 并发数: %d\n--------------------\n", totalTasks, numThreads)
+	}
+	
 	for i, urlToProcess := range finalUrls {
 		wg.Add(1)
 		semaphore <- struct{}{}
@@ -205,6 +217,7 @@ func runDownloads(initialUrls []string, isBatch bool) {
 
 func main() {
 	core.InitFlags()
+	pflag.BoolVar(&jsonOutput, "json-output", false, "启用JSON输出 (供给桌面App使用)")
 
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "用法: %s [选项] [url1 url2 ...]\n", os.Args[0])
@@ -244,6 +257,11 @@ func main() {
 
 	args := pflag.Args()
 	if len(args) == 0 {
+		if jsonOutput {
+			fmt.Println(`{"status": "error", "track": "system", "message": "JSON 模式下不支持交互式输入"}`)
+			return
+		}
+		
 		fmt.Print("请输入专辑链接或txt文件路径: ")
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')
@@ -281,9 +299,10 @@ func main() {
 		runDownloads(args, false)
 	}
 
-	fmt.Printf("\n=======  [✔ ] Completed: %d/%d  |  [⚠ ] Warnings: %d  |  [✖ ] Errors: %d  =======\n", core.Counter.Success, core.Counter.Total, core.Counter.Unavailable+core.Counter.NotSong, core.Counter.Error)
-	if core.Counter.Error > 0 {
-		fmt.Println("部分任务在执行过程中出错，请检查上面的日志记录。")
+	if !jsonOutput {
+		fmt.Printf("\n=======  [✔ ] Completed: %d/%d  |  [⚠ ] Warnings: %d  |  [✖ ] Errors: %d  =======\n", core.Counter.Success, core.Counter.Total, core.Counter.Unavailable+core.Counter.NotSong, core.Counter.Error)
+		if core.Counter.Error > 0 {
+			fmt.Println("部分任务在执行过程中出错，请检查上面的日志记录")
+		}
 	}
 }
-
