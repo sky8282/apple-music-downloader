@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Apple Music Desktop</title>
+    <style>
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: transparent; 
+            color: #eee;
+        }
+        .view-container {
+            display: none;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #view-taskbar {
+            --bg-primary: rgba(30, 30, 30, 0.95);
+            --bg-secondary: #333;
+            --color-text: #eee;
+            --color-text-dim: #aaa;
+            --color-border: #444;
+            --color-green: #1DB954; 
+            --color-red: #e74c3c;
+            --color-white: #FFFFFF; 
+            --color-bright-yellow: #ffcc00; 
+        }
+        #view-taskbar #task-bar {
+            width: 100%; height: 100%;
+            background-color: var(--bg-primary, rgba(30, 30, 30, 0.95));
+            border-top: 1px solid var(--color-border, #444);
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+        }
+        #view-taskbar #task-controls {
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--color-border, #444);
+            flex-shrink: 0;
+            color: var(--color-text, #eee);
+        }
+        #view-taskbar .nav-button {
+            background: none; border: 1px solid var(--color-border, #444); color: var(--color-text-dim, #aaa);
+            cursor: pointer; padding: 4px 8px; border-radius: 5px; margin-right: 5px;
+        }
+        #view-taskbar #queue-button {
+            background-color: var(--bg-secondary, #333); border: none; color: var(--color-text, #eee);
+            padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px;
+            margin-left: 10px;
+        }
+        
+        #view-taskbar .service-button {
+            background-color: var(--bg-secondary, #333);
+            border: none;
+            color: var(--color-text-dim, #aaa); 
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 8px;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        #view-taskbar .service-button:hover {
+             color: var(--color-text, #eee); 
+        }
+        #view-taskbar .service-button.active {
+            background-color: var(--color-bright-yellow); 
+            color: #000; 
+            font-weight: bold;
+        }
+        
+        #view-taskbar #queue-count {
+            background-color: var(--color-red, #e74c3c); border-radius: 50%;
+            padding: 0 5px; font-size: 10px; margin-left: 5px;
+        }
+        #view-taskbar .taskbar-controls { margin-left: auto; }
+        #view-taskbar .control-button {
+            background: none; border: 1px solid var(--color-border, #444); color: var(--color-text-dim, #aaa);
+            cursor: pointer; padding: 4px 8px; border-radius: 5px; margin-left: 5px;
+        }
+        #view-taskbar #restore-button { display: none; }
+        #view-taskbar #current-task-display {
+            flex-grow: 1;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-height: 0;
+            overflow-y: auto;
+            color: var(--color-text, #eee);
+        }
+        #view-taskbar #album-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 4px 4px 4px;
+        }
+        #view-taskbar #current-album-name {
+            color: #fff;
+            font-weight: bold;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #view-taskbar #current-task-display.idle #current-album-name {
+            color: var(--color-text-dim, #aaa);
+            font-style: italic;
+        }
+        #view-taskbar #album-status-text {
+            font-size: 12px;
+            color: var(--color-text-dim, #aaa);
+            white-space: nowrap;
+        }
+        #view-taskbar .task-cancel-button {
+            background-color: var(--color-red, #e74c3c); color: white; border: none; border-radius: 50%;
+            width: 20px; height: 20px; cursor: pointer; font-weight: bold; line-height: 18px;
+            flex-shrink: 0;
+        }
+        #view-taskbar #track-list-container {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        #view-taskbar .track-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 2px 0;
+        }
+        #view-taskbar .track-label {
+            font-size: 12px;
+            color: var(--color-text-dim, #aaa);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 30%;
+            min-width: 0;
+        }
+        #view-taskbar .task-progress {
+            flex-grow: 1;
+            background-color: #555;
+            border-radius: 5px;
+            overflow: hidden;
+            height: 16px;
+        }
+        #view-taskbar .progress-bar {
+            width: 0%; height: 100%;
+            background-color: var(--color-green, #1DB954);
+            transition: width 0.2s;
+            text-align: center; line-height: 16px;
+            font-size: 10px; 
+            color: black; 
+        }
+        #view-taskbar .track-status-text {
+            font-size: 12px;
+            color: var(--color-text-dim, #aaa);
+            width: 100px;
+            text-align: right;
+            white-space: nowrap;
+        }
+        #view-taskbar #task-bar.collapsed { overflow: hidden; }
+        #view-taskbar #task-bar.collapsed #current-task-display { display: none; }
+        #view-taskbar #task-bar.collapsed #minimize-button { display: none; }
+        #view-taskbar #task-bar.collapsed #restore-button { display: inline-block; }
+
+        #view-queue {
+            background-color: #222;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+        }
+        #view-queue #queue-modal-list {
+            overflow-y: auto;
+            padding: 10px;
+            flex-grow: 1;
+        }
+        #view-queue .queue-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #444;
+        }
+        #view-queue .queue-item:last-child { border-bottom: none; }
+        #view-queue .queue-item-name {
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        #view-queue .task-cancel-button {
+            background-color: #e74c3c; color: white;
+            border: none; border-radius: 50%;
+            width: 20px; height: 20px;
+            cursor: pointer; font-weight: bold; line-height: 18px;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="view-taskbar" class="view-container">
+        <div id="task-bar">
+            <div id="task-controls">
+                <button id="back-button" class="nav-button" title="后退">&lt;</button>
+                <button id="fwd-button" class="nav-button" title="前进">&gt;</button>
+                
+                <button id="queue-button">
+                    等待队列 <span id="queue-count">0</span>
+                </button>
+
+                <button id="btn-service-music" class="service-button">Music</button>
+                <button id="btn-service-classical" class="service-button">Classical</button>
+
+                <div class="taskbar-controls">
+                    <button id="minimize-button" class="control-button" title="最小化">_</button>
+                    <button id="restore-button" class="control-button" title="还原">口</button>
+                </div>
+            </div>
+            <div id="current-task-display" class="idle">
+                <div id="album-header">
+                    <span id="current-album-name">等待任务...</span>
+                    <span id="album-status-text"></span>
+                    <button class="task-cancel-button" id="current-task-cancel-button" style="visibility: hidden;">&times;</button>
+                </div>
+                
+                <div id="track-list-container">
+                    </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <div id="view-queue" class="view-container">
+        <div id="queue-modal-list">
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const hash = window.location.hash;
+
+            function loadScript(src) {
+                const script = document.createElement('script');
+                script.src = src;
+                script.defer = true;
+                document.body.appendChild(script);
+            }
+            
+            if (hash === '#taskbar') {
+                document.getElementById('view-taskbar').style.display = 'block';
+                document.title = '任务栏';
+                loadScript('./renderer.js');
+
+            } else if (hash === '#queue') {
+                document.getElementById('view-queue').style.display = 'flex';
+                document.title = '下载队列';
+                loadScript('./queue.js');
+            }
+        })();
+    </script>
+</body>
+</html>
