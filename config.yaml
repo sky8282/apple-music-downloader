@@ -11,35 +11,35 @@ accounts:
     decrypt-m3u8-port: "127.0.0.1:10020" # 此账号对应的解密服务端口
     get-m3u8-port: "127.0.0.1:10021"     # 此账号对应的M3U8获取服务端口
 # ----------------------------------------------------------------
-  - name: "US"
-    storefront: "us"
-    media-user-token: "your-media-user-token"
-    # authorization-token: "your-us-auth-token"
-    decrypt-m3u8-port: "127.0.0.1:20020"
-    get-m3u8-port: "127.0.0.1:20021"
+#  - name: "US"
+#    storefront: "us"
+#    media-user-token: "your-media-user-token"
+#    authorization-token: "your-us-auth-token"
+#    decrypt-m3u8-port: "127.0.0.1:20020"
+#    get-m3u8-port: "127.0.0.1:20021"
 # ----------------------------------------------------------------
-  # - name: "JP"
-  #   storefront: "jp"
-  #   media-user-token: "your-media-user-token"
-  #   authorization-token: "your-us-auth-token"
-  #   decrypt-m3u8-port: "127.0.0.1:30020"
-  #   get-m3u8-port: "127.0.0.1:30021"
+# - name: "JP"
+#   storefront: "jp"
+#   media-user-token: "your-media-user-token"
+#   authorization-token: "your-us-auth-token"
+#   decrypt-m3u8-port: "127.0.0.1:30020"
+#   get-m3u8-port: "127.0.0.1:30021"
 # ----------------------------------------------------------------  
 # 下载保存路径设置
-alac-save-folder: "/home/music"
-atmos-save-folder: "/home/music"
+alac-save-folder: "./music"
+atmos-save-folder: "./music"
 #################################
 #经常下载失败请按自身网络环境调整参数 #
 # m3u8切片数量。                  #
-chunk_downloadthreads: 30       #
+chunk_downloadthreads: 10       #
 # 网络块大小                      #
 NetworkReadBufferKB: 4096 # kb  #
 # I/O缓冲，过大将导致内存占用过高    #
 BufferSizeKB: 4 # kb            #
 # 下载线程数，最低为 1             #
-aac_downloadthreads: 30         #
-lossless_downloadthreads: 30    #
-hires_downloadthreads: 30       #
+aac_downloadthreads: 5          #
+lossless_downloadthreads: 5     #
+hires_downloadthreads: 5        #
 #################################
 # ---------------------------------------------------------------- 
 # go run main.go 直接回车执行txt模式
@@ -65,7 +65,7 @@ default-lyric-storefront: "cn"
 lrc-type: "lyrics"   # 可选: "lyrics" (普通歌词) 或 "syllable-lyrics" (逐字歌词)
 lrc-format: "lrc"    # 可选: "lrc" 或 "ttml"
 embed-lrc: true      # 是否将歌词嵌入音频文件
-save-lrc-file: true  # 是否将歌词另存为 .lrc 文件
+save-lrc-file: false  # 是否将歌词另存为 .lrc 文件
 
 # 封面与插图设置
 embed-cover: true
@@ -82,7 +82,7 @@ get-m3u8-mode: "hires" # 可选: "all" (获取所有) 或 "hires" (仅探测Hi-R
 aac-type: "aac-lc"        # 可选: "aac-lc", "aac", "aac-binaural", "aac-downmix"
 alac-max: 192000          # 可选: 192000, 96000, 48000, 44100
 atmos-max: 2768           # 可选: 2768, 2448
-download-videos: true     #是否下载视频 true开启，false关闭
+download-videos: true     #是否下载视频 true开启，false关闭，需要安装 mp4decrypt 和 media-user-token
 mv-audio-type: "atmos"    # MV音轨偏好, 可选: "atmos", "ac3", "aac"
 mv-max: 2160              # MV视频分辨率偏好
 
