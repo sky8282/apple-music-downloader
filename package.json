@@ -1,14 +1,112 @@
 {
   "name": "apple-music-desktop",
   "version": "1.0.0",
-  "description": "Apple Music Downloader Desktop App",
+  "description": "Apple Music Downloader",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder --dir"
   },
-  "dependencies": {
-    "electron": "^28.0.0"
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "28.0.0",
+    "electron-builder": "24.6.4"
   },
-  "devDependencies": {},
-  "author": ""
+  "author": "@sky82813",
+  "build": {
+    "appId": "com.sky82813.apple-music-desktop",
+    "productName": "Apple Music Downloader",
+    "files": [
+      "main.js",
+      "index.html",
+      "renderer.js",
+      "preload.js",
+      "queue.js",
+      "injector.js",
+      "node_modules/",
+      "package.json",
+      "!*.go",
+      "!go.mod",
+      "!go.sum"
+    ],
+    "asar": true,
+    "mac": {
+      "target": "dir",
+      "icon": "AppIcon.icns",
+      "extraResources": [
+        {
+          "from": "./downloader",
+          "to": "./downloader"
+        },
+        {
+          "from": "./ffmpeg",
+          "to": "./ffmpeg"
+        },
+        {
+          "from": "./MP4Box",
+          "to": "./MP4Box"
+        },
+        {
+          "from": "./mp4decrypt",
+          "to": "./mp4decrypt"
+        },
+        {
+          "from": "./config.yaml",
+          "to": "./config.yaml"
+        }
+      ]
+    },
+    "win": {
+      "target": "dir",
+      "icon": "AppIcon.ico",
+      "extraResources": [
+        {
+          "from": "./downloader.exe",
+          "to": "./downloader.exe"
+        },
+        {
+          "from": "./ffmpeg.exe",
+          "to": "./ffmpeg.exe"
+        },
+        {
+          "from": "./MP4Box.exe",
+          "to": "./MP4Box.exe"
+        },
+        {
+          "from": "./mp4decrypt.exe",
+          "to": "./mp4decrypt.exe"
+        },
+        {
+          "from": "./config.yaml",
+          "to": "./config.yaml"
+        }
+      ]
+    },
+    "linux": {
+      "target": "dir",
+      "icon": "AppIcon.png",
+      "extraResources": [
+        {
+          "from": "./downloader",
+          "to": "./downloader"
+        },
+        {
+          "from": "./ffmpeg",
+          "to": "./ffmpeg"
+        },
+        {
+          "from": "./MP4Box",
+          "to": "./MP4Box"
+        },
+        {
+          "from": "./mp4decrypt",
+          "to": "./mp4decrypt"
+        },
+        {
+          "from": "./config.yaml",
+          "to": "./config.yaml"
+        }
+      ]
+    }
+  }
 }
