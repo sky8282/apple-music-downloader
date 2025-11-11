@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
@@ -19,6 +20,18 @@ import (
 
 var jsonOutput bool
 
+func printJSONError(message string) {
+	type JsonError struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+	}
+	errJSON, _ := json.Marshal(JsonError{
+		Status:  "error",
+		Message: message,
+	})
+	fmt.Println(string(errJSON))
+}
+
 func handleSingleMV(urlRaw string) {
 	if core.Debug_mode {
 		return
@@ -26,7 +39,11 @@ func handleSingleMV(urlRaw string) {
 	storefront, albumId := parser.CheckUrlMv(urlRaw)
 	accountForMV, err := core.GetAccountForStorefront(storefront)
 	if err != nil {
-		fmt.Printf("MV 下载失败: %v\n", err)
+		if jsonOutput {
+			printJSONError(fmt.Sprintf("MV 下载失败: %v", err))
+		} else {
+			fmt.Printf("MV 下载失败: %v\n", err)
+		}
 		core.SharedLock.Lock()
 		core.Counter.Error++
 		core.SharedLock.Unlock()
@@ -40,22 +57,51 @@ func handleSingleMV(urlRaw string) {
 		core.SharedLock.Lock()
 		core.Counter.Error++
 		core.SharedLock.Unlock()
+		if jsonOutput {
+			printJSONError("MV 下载失败: media-user-token 无效")
+		}
 		return
 	}
 	if _, err := exec.LookPath("mp4decrypt"); err != nil {
 		core.SharedLock.Lock()
 		core.Counter.Error++
 		core.SharedLock.Unlock()
+		if jsonOutput {
+			printJSONError("MV 下载失败: 未找到 mp4decrypt")
+		}
 		return
 	}
 
 	mvInfo, err := api.GetMVInfoFromAdam(albumId, accountForMV, storefront)
 	if err != nil {
-		fmt.Printf("获取 MV 信息失败: %v\n", err)
+		errMsg := fmt.Sprintf("获取 MV 信息失败: %v", err)
+		if jsonOutput {
+			printJSONError(errMsg)
+		} else {
+			fmt.Println(errMsg)
+		}
 		core.SharedLock.Lock()
 		core.Counter.Error++
 		core.SharedLock.Unlock()
 		return
+	}
+
+	if jsonOutput {
+		type JsonStatus struct {
+			Status    string `json:"status"`
+			TrackNum  int    `json:"trackNum"`
+			TrackName string `json:"trackName"`
+			AlbumName string `json:"albumName"`
+			AlbumID   string `json:"albumId"`
+		}
+		statusJSON, _ := json.Marshal(JsonStatus{
+			Status:    "start",
+			TrackNum:  1,
+			TrackName: mvInfo.Data[0].Attributes.Name,
+			AlbumName: mvInfo.Data[0].Attributes.Name,
+			AlbumID:   albumId,
+		})
+		fmt.Println(string(statusJSON))
 	}
 
 	var artistFolder string
@@ -74,11 +120,34 @@ func handleSingleMV(urlRaw string) {
 		core.SharedLock.Lock()
 		core.Counter.Error++
 		core.SharedLock.Unlock()
+		if jsonOutput {
+			printJSONError(fmt.Sprintf("MV 下载失败: %v", err))
+		}
 		return
 	}
 	core.SharedLock.Lock()
 	core.Counter.Success++
 	core.SharedLock.Unlock()
+
+	if jsonOutput {
+		type JsonStatusComplete struct {
+			Status     string `json:"status"`
+			TrackNum   int    `json:"trackNum"`
+			TrackName  string `json:"trackName"`
+			AlbumName  string `json:"albumName"`
+			AlbumID    string `json:"albumId"`
+			Percentage int    `json:"percentage"`
+		}
+		statusJSON, _ := json.Marshal(JsonStatusComplete{
+			Status:     "complete",
+			TrackNum:   1,
+			TrackName:  mvInfo.Data[0].Attributes.Name,
+			AlbumName:  mvInfo.Data[0].Attributes.Name,
+			AlbumID:    albumId,
+			Percentage: 100,
+		})
+		fmt.Println(string(statusJSON))
+	}
 }
 
 func processURL(urlRaw string, wg *sync.WaitGroup, semaphore chan struct{}, currentTask int, totalTasks int) {
@@ -104,12 +173,22 @@ func processURL(urlRaw string, wg *sync.WaitGroup, semaphore chan struct{}, curr
 		tempStorefront, _ := parser.CheckUrlSong(urlRaw)
 		accountForSong, err := core.GetAccountForStorefront(tempStorefront)
 		if err != nil {
-			fmt.Printf("获取歌曲信息失败 for %s: %v\n", urlRaw, err)
+			errMsg := fmt.Sprintf("获取歌曲信息失败 for %s: %v", urlRaw, err)
+			if jsonOutput {
+				printJSONError(errMsg)
+			} else {
+				fmt.Println(errMsg)
+			}
 			return
 		}
 		urlRaw, err = api.GetUrlSong(urlRaw, accountForSong)
 		if err != nil {
-			fmt.Printf("获取歌曲链接失败 for %s: %v\n", urlRaw, err)
+			errMsg := fmt.Sprintf("获取歌曲链接失败 for %s: %v", urlRaw, err)
+			if jsonOutput {
+				printJSONError(errMsg)
+			} else {
+				fmt.Println(errMsg)
+			}
 			return
 		}
 		core.Dl_song = true
@@ -122,20 +201,35 @@ func processURL(urlRaw string, wg *sync.WaitGroup, semaphore chan struct{}, curr
 	}
 
 	if albumId == "" {
-		fmt.Printf("无效的URL: %s\n", urlRaw)
+		errMsg := fmt.Sprintf("无效的URL: %s", urlRaw)
+		if jsonOutput {
+			printJSONError(errMsg)
+		} else {
+			fmt.Println(errMsg)
+		}
 		return
 	}
 
 	parse, err := url.Parse(urlRaw)
 	if err != nil {
-		log.Printf("解析URL失败 %s: %v", urlRaw, err)
+		errMsg := fmt.Sprintf("解析URL失败 %s: %v", urlRaw, err)
+		if jsonOutput {
+			printJSONError(errMsg)
+		} else {
+			log.Println(errMsg)
+		}
 		return
 	}
 	var urlArg_i = parse.Query().Get("i")	
 	err = downloader.Rip(albumId, storefront, urlArg_i, urlRaw, jsonOutput)
 	
 	if err != nil {
-		fmt.Printf("专辑下载失败: %s -> %v\n", urlRaw, err)
+		errMsg := fmt.Sprintf("专辑下载失败: %s -> %v", urlRaw, err)
+		if jsonOutput {
+			printJSONError(errMsg)
+		} else {
+			fmt.Println(errMsg)
+		}
 	} else {
 		if totalTasks > 1 && !jsonOutput {
 			fmt.Printf("[%d/%d] 任务完成: %s\n", currentTask, totalTasks, urlRaw)
@@ -149,7 +243,7 @@ func runDownloads(initialUrls []string, isBatch bool) {
 	for _, urlRaw := range initialUrls {
 		if strings.Contains(urlRaw, "/artist/") {
 			if jsonOutput {
-				fmt.Printf("JSON 模式下不支持艺术家页面解析: %s\n", urlRaw)
+				printJSONError(fmt.Sprintf("JSON 模式下不支持艺术家页面解析: %s", urlRaw))
 				continue
 			}
 
@@ -231,11 +325,21 @@ func main() {
 	err := core.LoadConfig(core.ConfigPath)
 	if err != nil {
 		if os.IsNotExist(err) && core.ConfigPath == "config.yaml" {
-			fmt.Println("错误: 默认配置文件 config.yaml 未找到。")
-			pflag.Usage()
+			errMsg := "错误: 默认配置文件 config.yaml 未找到。"
+			if jsonOutput {
+				printJSONError(errMsg)
+			} else {
+				fmt.Println(errMsg)
+				pflag.Usage()
+			}
 			return
 		}
-		fmt.Printf("加载配置文件 %s 失败: %v\n", core.ConfigPath, err)
+		errMsg := fmt.Sprintf("加载配置文件 %s 失败: %v", core.ConfigPath, err)
+		if jsonOutput {
+			printJSONError(errMsg)
+		} else {
+			fmt.Println(errMsg)
+		}
 		return
 	}
 
@@ -249,7 +353,12 @@ func main() {
 		if len(core.Config.Accounts) > 0 && core.Config.Accounts[0].AuthorizationToken != "" && core.Config.Accounts[0].AuthorizationToken != "your-authorization-token" {
 			token = strings.Replace(core.Config.Accounts[0].AuthorizationToken, "Bearer ", "", -1)
 		} else {
-			fmt.Println("获取开发者 token 失败。")
+			errMsg := "获取开发者 token 失败。"
+			if jsonOutput {
+				printJSONError(errMsg)
+			} else {
+				fmt.Println(errMsg)
+			}
 			return
 		}
 	}
@@ -258,7 +367,7 @@ func main() {
 	args := pflag.Args()
 	if len(args) == 0 {
 		if jsonOutput {
-			fmt.Println(`{"status": "error", "track": "system", "message": "JSON 模式下不支持交互式输入"}`)
+			printJSONError("JSON 模式下不支持交互式输入")
 			return
 		}
 		
