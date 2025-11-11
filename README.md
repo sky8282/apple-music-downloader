@@ -41,7 +41,12 @@ Original script by Sorrow. Modified by me to include some fixes and improvements
     1. 安装node，检查node -v 和 npm -v
     2. 根目录下执行  npm install   安装依赖
     3. 根目录下执行  npm start     开始运行
-    4. 需要打包成桌面APP的话，自行修改代码
+    4. 需要打包成桌面APP的话：
+        1. go build -ldflags="-s -w" -o downloader main.go 打包go为二进制文件，文件名 downloader
+        2. 放入二进制 MP4Box  mp4decrypt  ffmpeg 并给权限如：macos/linux  chmod +x
+        3. npm run build
+        4. 或自行修改代码
+        
 
 ![1](https://github.com/user-attachments/assets/8ce4006d-4b9f-4436-b6bf-12125c343dc0)
 
