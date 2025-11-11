@@ -37,7 +37,7 @@ Original script by Sorrow. Modified by me to include some fixes and improvements
 7. For aac: `go run main.go --aac https://music.apple.com/us/album/1989-taylors-version-deluxe/1713845538`.
 8. For see quality: `go run main.go --debug https://music.apple.com/us/album/1989-taylors-version-deluxe/1713845538`.
 9. go run main.go     直接回车启动txt模式
- 10. 网页注入下载：
+10. 网页注入下载：
     a. 安装node，检查node -v 和 npm -v
     b. 根目录下执行  npm install   安装依赖
     c. 根目录下执行  npm start     开始运行
