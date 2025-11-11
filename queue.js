@@ -6,31 +6,36 @@ window.desktopApp.onQueueSnapshot((initialQueue) => {
     queue = initialQueue;
     render();
 });
-window.desktopApp.onTaskQueued((task) => {
-    queue.push(task);
-    render();
-});
-window.desktopApp.onTaskCancelled((taskId) => {
-    queue = queue.filter(t => t.id !== taskId);
-    render();
-});
-window.desktopApp.onTaskStarted((task) => {
-    queue = queue.filter(t => t.id !== task.id);
+
+window.desktopApp.onQueueUpdate((updatedQueue) => {
+    queue = updatedQueue;
     render();
 });
 
 function render() {
     queueList.innerHTML = '';
-    queue.forEach(task => {
+    
+    const tasksToRender = queue.filter(t => t.status !== 'finished');
+
+    tasksToRender.forEach((task, index) => {
         const item = document.createElement('div');
         item.className = 'queue-item';
         item.id = `queue-item-${task.id}`;
+        
+        let progressText = '(等待中)';
+        if (task.status === 'running') {
+            progressText = `(${task.completedTracks || 0} / ${task.totalTracks || '?'})`;
+        }
+
+        const displayName = `${index + 1}. ${task.name} ${progressText}`;
+        
         item.innerHTML = `
-            <span class="queue-item-name" title="${task.name}">${task.name}</span>
+            <span class="queue-item-name" title="${displayName}">${displayName}</span>
             <button class="task-cancel-button" data-task-id="${task.id}">&times;</button>
         `;
         queueList.appendChild(item);
     });
+    
     queueList.querySelectorAll('.task-cancel-button').forEach(button => {
         button.addEventListener('click', (e) => {
             const taskId = e.target.dataset.taskId;
