@@ -149,19 +149,36 @@
         const linkEl = videoWrapper.querySelector('a[data-testid="click-action"]');
         const artworkEl = videoWrapper.querySelector('[data-testid="artwork-component"]');
         if (!linkEl || !linkEl.href || !artworkEl) return;
-        const url = new URL(linkEl.href, window.location.origin).href;
+        
+        const urlObj = new URL(linkEl.href, window.location.origin);
+        const url = urlObj.href;
+
         const cardRoot = videoWrapper.closest('li[class*="grid-item"], div[class*="product-card"], div[class*="product-lockup"]');
         let name = '未知视频';
         let artist = '未知歌手';
+
         if (cardRoot) {
             const nameEl = cardRoot.querySelector('div[class*="lockup__title"]') || cardRoot.querySelector('a[data-testid="product-lockup-link"]');
             const artistEl = cardRoot.querySelector('div[class*="lockup__subtitle"]');
             if (nameEl) name = nameEl.textContent.trim();
-            if (name === '未知视频') name = url.split('/')[4] || '未知视频';
             if (artistEl) artist = artistEl.textContent.trim();
-        } else {
-             name = url.split('/')[4] || '未知视频';
         }
+
+        if (name === '未知视频' || (cardRoot && !cardRoot.querySelector('div[class*="lockup__title"]'))) {
+            const pathParts = urlObj.pathname.split('/');
+            const videoIndex = pathParts.indexOf('music-video');
+            if (videoIndex > -1 && videoIndex + 1 < pathParts.length) {
+                const potentialSlug = pathParts[videoIndex + 1];
+                if (isNaN(Number(potentialSlug)) && potentialSlug.trim() !== '') {
+                    name = potentialSlug;
+                }
+            }
+        }
+        
+        if (name === '未知视频') {
+             name = url.split('/').pop() || '未知视频';
+        }
+
         const details = { name: name, artist: artist };
         const buttonEl = createButtons(url, details, true);
         const buttonContainer = document.createElement('div');
@@ -197,5 +214,5 @@
         }
     });    
     observer.observe(document.body, { childList: true, subtree: true });
-    console.log('[Injector.js] 音乐下载助手 (v34 - 视频和卡片按钮修复) 已加载。');
+    console.log('Apple Music 助手已加载');
 })();
