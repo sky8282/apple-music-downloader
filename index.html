@@ -44,6 +44,38 @@
             flex-shrink: 0;
             color: var(--color-text, #eee);
         }
+        
+        #view-taskbar #url-downloader-container {
+            display: flex;
+            margin-left: 10px;
+            flex-grow: 1;
+        }
+        #view-taskbar #url-input {
+            flex-grow: 1;
+            background-color: var(--bg-secondary, #333);
+            border: 1px solid var(--color-border, #444);
+            color: var(--color-text, #eee);
+            padding: 4px 8px;
+            border-radius: 5px 0 0 5px;
+            font-size: 12px;
+            min-width: 100px;
+            outline: none;
+        }
+        #view-taskbar #url-input:focus {
+            border-color: var(--color-text-dim, #aaa);
+        }
+        #view-taskbar #url-download-button {
+            background-color: var(--color-green, #1DB954);
+            border: none;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 0 5px 5px 0;
+            font-size: 12px;
+            margin-left: -1px; /* Overlap border */
+        }
+
         #view-taskbar .nav-button {
             background: none; border: 1px solid var(--color-border, #444); color: var(--color-text-dim, #aaa);
             cursor: pointer; padding: 4px 8px; border-radius: 5px; margin-right: 5px;
@@ -210,13 +242,20 @@
             <div id="task-controls">
                 <button id="back-button" class="nav-button" title="后退">&lt;</button>
                 <button id="fwd-button" class="nav-button" title="前进">&gt;</button>
+                <button id="refresh-button" class="nav-button" title="刷新">&#8635;</button>
                 
-                <button id="queue-button">
+                <button id="queue-button" style="display: none;">
                     等待队列 <span id="queue-count">0</span>
                 </button>
 
                 <button id="btn-service-music" class="service-button">Music</button>
                 <button id="btn-service-classical" class="service-button">Classical</button>
+                <button id="btn-edit-config" class="service-button" title="编辑配置文件">Config</button>
+
+                <div id="url-downloader-container">
+                    <input type="text" id="url-input" placeholder="输入URL..."/>
+                    <button id="url-download-button" title="下载URL">Go</button>
+                </div>
 
                 <div class="taskbar-controls">
                     <button id="minimize-button" class="control-button" title="最小化">_</button>
