@@ -156,7 +156,9 @@ window.desktopApp.onGoOutput((message) => {
         currentAlbumName = data.albumName; 
     }
 
-    if (typeof data.trackNum === 'undefined') {
+    const trackNum = parseInt(data.trackNum, 10);
+
+    if (typeof data.trackNum === 'undefined' || isNaN(trackNum) || trackNum === 0) {
         if (data.status === 'log') {
             console.log(`[Go Log]: ${data.message}`);
         } else if (data.status === 'error') {
@@ -166,7 +168,6 @@ window.desktopApp.onGoOutput((message) => {
         return; 
     }
 
-    const trackNum = parseInt(data.trackNum, 10);
     if (trackNum > currentAlbumTotalTracks) {
         currentAlbumTotalTracks = trackNum;
     }
