@@ -7,8 +7,12 @@ const minimizeButton = document.getElementById('minimize-button');
 const restoreButton = document.getElementById('restore-button');
 const backButton = document.getElementById('back-button');
 const fwdButton = document.getElementById('fwd-button');
+const refreshButton = document.getElementById('refresh-button');
 const btnServiceMusic = document.getElementById('btn-service-music');
 const btnServiceClassical = document.getElementById('btn-service-classical');
+const btnEditConfig = document.getElementById('btn-edit-config');
+const urlInput = document.getElementById('url-input');
+const urlDownloadButton = document.getElementById('url-download-button');
 const display = document.getElementById('current-task-display');
 const albumNameEl = document.getElementById('current-album-name');
 const albumStatusEl = document.getElementById('album-status-text');
@@ -36,6 +40,7 @@ restoreButton.addEventListener('click', () => {
 
 backButton.addEventListener('click', () => window.desktopApp.navigateBack());
 fwdButton.addEventListener('click', () => window.desktopApp.navigateFwd());
+refreshButton.addEventListener('click', () => window.desktopApp.refreshPage());
 
 queueButton.addEventListener('click', () => {
     console.log("show-queue clicked");
@@ -47,6 +52,22 @@ btnServiceMusic.addEventListener('click', () => {
 });
 btnServiceClassical.addEventListener('click', () => {
     window.desktopApp.switchService(CLASSICAL_URL);
+});
+btnEditConfig.addEventListener('click', () => {
+    window.desktopApp.openConfig();
+});
+
+urlDownloadButton.addEventListener('click', () => {
+    const url = urlInput.value.trim();
+    if (url && window.desktopApp.downloadUrl) {
+        window.desktopApp.downloadUrl(url);
+        urlInput.value = '';
+    }
+});
+urlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        urlDownloadButton.click();
+    }
 });
 
 window.desktopApp.onSetTaskbarState((isMinimized) => {
@@ -63,10 +84,26 @@ window.desktopApp.onSetActiveService((url) => {
     btnServiceClassical.classList.toggle('active', url.startsWith(CLASSICAL_URL));
 });
 
-window.desktopApp.onTaskQueued(() => updateQueueCount(1));
-window.desktopApp.onTaskCancelled(() => updateQueueCount(-1));
+window.desktopApp.onSetQueueLength((length) => {
+    queueLength = length;
+    updateQueueCount(queueLength);
+});
+
+window.desktopApp.onTaskQueued(() => {
+    queueLength++;
+    updateQueueCount(queueLength);
+});
+
+window.desktopApp.onTaskCancelled(() => {
+    queueLength--;
+    if (queueLength < 0) queueLength = 0;
+    updateQueueCount(queueLength);
+});
+
 window.desktopApp.onTaskStarted((task) => {
-    updateQueueCount(-1); 
+    queueLength--;
+    if (queueLength < 0) queueLength = 0;
+    updateQueueCount(queueLength); 
 
     if (clearTaskTimer) {
         clearTimeout(clearTaskTimer);
@@ -77,11 +114,11 @@ window.desktopApp.onTaskStarted((task) => {
     currentAlbumName = task.name; 
     taskDataStore = {}; 
     trackListContainer.innerHTML = ''; 
-    currentAlbumTotalTracks = 0; 
+    currentAlbumTotalTracks = task.totalTracks || 0; 
     
     display.classList.remove('idle');
     albumNameEl.textContent = currentAlbumName;
-    albumStatusEl.textContent = "初始化..."; 
+    albumStatusEl.textContent = `( ${task.completedTracks || 0} / ${task.totalTracks || '?'} )`; 
     cancelBtn.style.visibility = 'visible';
     cancelBtn.onclick = () => window.desktopApp.cancelTask(currentTaskId);
 });
@@ -102,10 +139,22 @@ window.desktopApp.onTaskFinished((taskId) => {
     }
 });
 
+window.desktopApp.onTaskProgressUpdate(({ id, completed, total }) => {
+    if (id === currentTaskId) {
+        currentAlbumTotalTracks = total;
+        albumStatusEl.textContent = `( ${completed} / ${total} )`;
+    }
+});
+
 window.desktopApp.onGoOutput((message) => {
     let data;
     try { data = JSON.parse(message); } catch (e) { return; }
     if (data.taskId !== currentTaskId) return; 
+
+    if (data.albumName && albumNameEl.textContent !== data.albumName) {
+        albumNameEl.textContent = data.albumName;
+        currentAlbumName = data.albumName; 
+    }
 
     if (typeof data.trackNum === 'undefined') {
         if (data.status === 'log') {
@@ -120,10 +169,6 @@ window.desktopApp.onGoOutput((message) => {
     const trackNum = parseInt(data.trackNum, 10);
     if (trackNum > currentAlbumTotalTracks) {
         currentAlbumTotalTracks = trackNum;
-    }
-
-    if (data.albumName && albumNameEl.textContent !== data.albumName) {
-        albumNameEl.textContent = data.albumName;
     }
 
     const trackNumFormatted = String(data.trackNum).padStart(2, '0');
@@ -251,7 +296,6 @@ window.desktopApp.onGoOutput((message) => {
             console.error(`[Go Error] ${data.message}`);
             break;
     }
-    updateAlbumProgress();
 });
 
 function getSortOrder(status) {
@@ -271,30 +315,13 @@ function getSortOrder(status) {
     }
 }
 
-function updateQueueCount(change) {
-    queueLength += change;
-    if (queueLength < 0) queueLength = 0; 
-    queueCount.textContent = queueLength;
-    queueButton.style.display = queueLength > 0 ? 'inline-flex' : 'none';
+function updateQueueCount(length) {
+    const waitingTasks = queueLength;
+    queueCount.textContent = waitingTasks;
+    queueButton.style.display = waitingTasks > 0 ? 'inline-flex' : 'none';
 }
 
 function updateAlbumProgress() {
-    const tracks = Object.values(taskDataStore);
-    if (tracks.length === 0 && currentAlbumTotalTracks === 0) {
-        albumStatusEl.textContent = "初始化...";
-        return;
-    }
-
-    let completeCount = 0;
-    tracks.forEach(t => {
-        if (t.status === 'complete' || t.status === 'error' || t.status === 'exists') {
-            completeCount++;
-        }
-    });
-    
-    const total = currentAlbumTotalTracks > 0 ? currentAlbumTotalTracks : tracks.length;
-    
-    albumStatusEl.textContent = `( ${completeCount} / ${total} )`;
 }
 
 function autoClearCurrentTask(status, isError) {
