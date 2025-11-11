@@ -34,13 +34,15 @@ type JsonStatus struct {
 	Speed      string `json:"speed"`
 	Message    string `json:"message"`
 	AlbumID    string `json:"albumId"`
+	AlbumName  string `json:"albumName,omitempty"`
 }
 
-func printJSON(albumId string, trackNum int, trackName string, status string, percentage int, speed string, message string) {
+func printJSON(albumId string, trackNum int, trackName string, albumName string, status string, percentage int, speed string, message string) {
 	statusJSON, _ := json.Marshal(JsonStatus{
 		AlbumID:    albumId,
 		TrackNum:   trackNum,
 		TrackName:  trackName,
+		AlbumName:  albumName,
 		Status:     status,
 		Percentage: percentage,
 		Speed:      speed,
@@ -66,7 +68,7 @@ func checkAndReEncodeTrack(trackPath string, statusIndex int, jsonOutput bool, a
 	}
 
 	if jsonOutput {
-		printJSON(albumId, trackNum, trackName, "fix", 0, "", "文件损坏, 正在重新编码...")
+		printJSON(albumId, trackNum, trackName, "", "fix", 0, "", "文件损坏, 正在重新编码...")
 	} else {
 		ui.UpdateStatus(statusIndex, "文件损坏, 正在重新编码...", color.New(color.FgRed).SprintFunc())
 	}
@@ -117,7 +119,7 @@ func downloadTrackWithFallback(track structs.TrackData, meta *structs.AutoGenera
 		}
 		warningMsg := fmt.Sprintf("账户 %s 失败, 尝试下一个...", account.Name)
 		if jsonOutput {
-			printJSON(albumId, trackNum, track.Attributes.Name, "error", 0, "", warningMsg)
+			printJSON(albumId, trackNum, track.Attributes.Name, "", "error", 0, "", warningMsg)
 		} else {
 			updateStatus(statusIndex, warningMsg, color.New(color.FgRed).SprintFunc())
 		}
@@ -505,6 +507,8 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 	if !jsonOutput {
 		fmt.Printf("歌手: %s\n", meta.Data[0].Attributes.ArtistName)
 		fmt.Printf("专辑: %s\n", meta.Data[0].Attributes.Name)
+	} else {
+		printJSON(albumId, 0, "", meta.Data[0].Attributes.Name, "log", 0, "", "专辑信息已获取")
 	}
 
 	if core.Config.SaveArtistCover && !(strings.Contains(albumId, "pl.")) {
@@ -560,7 +564,7 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 				}
 			}
 			if !found {
-				printJSON(albumId, 0, meta.Data[0].Attributes.Name, "error", 0, "", "指定的单曲ID未在专辑中找到")
+				printJSON(albumId, 0, meta.Data[0].Attributes.Name, "", "error", 0, "", "指定的单曲ID未在专辑中找到")
 				return errors.New("指定的单曲ID未在专辑中找到")
 			}
 		} else {
@@ -726,7 +730,7 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 
 			if isDone {
 				if jsonOutput {
-					printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, "exists", 100, "", "已存在")
+					printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, meta.Data[0].Attributes.Name, "exists", 100, "", "已存在")
 				} else {
 					ui.UpdateStatus(statusIndex, "已存在", color.New(color.FgCyan).SprintFunc())
 				}
@@ -738,7 +742,7 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 			}
 
 			if jsonOutput {
-				printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, "start", 0, "", "等待下载...")
+				printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, meta.Data[0].Attributes.Name, "start", 0, "", "等待下载...")
 			}
 
 			red := color.New(color.FgRed).SprintFunc()
@@ -749,7 +753,7 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 			for attempt := 1; attempt <= PostDownloadMaxRetries; attempt++ {
 				if attempt > 1 {
 					if jsonOutput {
-						printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, "progress", 0, "", fmt.Sprintf("第 %d/%d 次重试...", attempt, PostDownloadMaxRetries))
+						printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, meta.Data[0].Attributes.Name, "progress", 0, "", fmt.Sprintf("第 %d/%d 次重试...", attempt, PostDownloadMaxRetries))
 					} else {
 						ui.UpdateStatus(statusIndex, fmt.Sprintf("第 %d/%d 次重试...", attempt, PostDownloadMaxRetries), yellow)
 					}
@@ -765,7 +769,7 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 							if p.Stage == "decrypt" {
 								status = "decrypt"
 							}
-							printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, status, p.Percentage, speedStr, "")
+							printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, meta.Data[0].Attributes.Name, status, p.Percentage, speedStr, "")
 						} else {
 							account := &workingAccounts[statusIndex%len(workingAccounts)]
 							accountInfo := fmt.Sprintf("%s 账号", strings.ToUpper(account.Storefront))
@@ -787,7 +791,7 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 					core.Counter.Total++
 					errMsg := fmt.Sprintf("下载失败: %v", err)
 					if jsonOutput {
-						printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, "error", 0, "", errMsg)
+						printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, meta.Data[0].Attributes.Name, "error", 0, "", errMsg)
 					} else {
 						ui.UpdateStatus(statusIndex, errMsg, red)
 					}
@@ -831,7 +835,7 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 
 				if postDownloadError != nil {
 					if jsonOutput {
-						printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, "error", 0, "", postDownloadError.Error())
+						printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, meta.Data[0].Attributes.Name, "error", 0, "", postDownloadError.Error())
 					} else {
 						ui.UpdateStatus(statusIndex, postDownloadError.Error(), yellow)
 					}
@@ -843,7 +847,7 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 					} else {
 						errMsg := fmt.Sprintf("所有重试均失败: %v", postDownloadError)
 						if jsonOutput {
-							printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, "error", 0, "", errMsg)
+							printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, meta.Data[0].Attributes.Name, "error", 0, "", errMsg)
 						} else {
 							ui.UpdateStatus(statusIndex, errMsg, red)
 						}
@@ -863,7 +867,7 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 					statusMsg = "重编码完成"
 				}
 				if jsonOutput {
-					printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, "complete", 100, "", statusMsg)
+					printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, meta.Data[0].Attributes.Name, "complete", 100, "", statusMsg)
 				} else {
 					if wasFixed {
 						ui.UpdateStatus(statusIndex, "重编码完成", color.New(color.FgRed).SprintFunc())
