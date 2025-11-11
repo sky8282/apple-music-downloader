@@ -38,14 +38,14 @@ Original script by Sorrow. Modified by me to include some fixes and improvements
 8. For see quality: `go run main.go --debug https://music.apple.com/us/album/1989-taylors-version-deluxe/1713845538`.
 9. go run main.go     直接回车启动txt模式
 10. 网页注入下载：
-    10-1. 安装node，检查node -v 和 npm -v
-    10-2. 根目录下执行  npm install   安装依赖
-    10-3. 根目录下执行  npm start     开始运行
-    10-4. 需要打包成桌面APP的话：
-        a. go build -ldflags="-s -w" -o downloader main.go 打包go为二进制文件，文件名 downloader
-        b. 放入二进制 MP4Box  mp4decrypt  ffmpeg 并给权限如：macos/linux  chmod +x
-        c. npm run build
-        d. 或自行修改代码
+    1. 安装node，检查node -v 和 npm -v
+    2. 根目录下执行  npm install   安装依赖
+    3. 根目录下执行  npm start     开始运行
+    4. 需要打包成桌面APP的话：
+        1. go build -ldflags="-s -w" -o downloader main.go 打包go为二进制文件，文件名 downloader
+        2. 放入二进制 MP4Box  mp4decrypt  ffmpeg 并给权限如：macos/linux  chmod +x
+        3. npm run build
+        4. 或自行修改代码
         
 ![2](https://github.com/user-attachments/assets/443344b5-c61d-4656-a3ae-6bb7a5062e14)
 
