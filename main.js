@@ -260,7 +260,15 @@ ipcMain.on('cancel-task', (event, taskId) => {
             }
         }
         activeTask.status = 'finished';
+        broadcast('task-finished', activeTask.id);
         activeTask = null;
+        
+        if (taskQueue.filter(t => t.status !== 'finished').length === 0 && !isTaskbarMinimized) {
+            isTaskbarMinimized = true;
+            syncTaskbarPosition();
+            broadcast('set-taskbar-state', true); 
+        }
+
     } else {
         taskToCancel.status = 'finished';
     }
