@@ -37,9 +37,9 @@ NetworkReadBufferKB: 4096 # kb  #
 # I/O缓冲，过大将导致内存占用过高    #
 BufferSizeKB: 4 # kb            #
 # 下载线程数，最低为 1             #
-aac_downloadthreads: 5          #
-lossless_downloadthreads: 5     #
-hires_downloadthreads: 5        #
+aac_downloadthreads: 3          #
+lossless_downloadthreads: 3     #
+hires_downloadthreads: 3        #
 #################################
 # ---------------------------------------------------------------- 
 # go run main.go 直接回车执行txt模式
