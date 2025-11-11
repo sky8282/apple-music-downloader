@@ -47,8 +47,9 @@ Original script by Sorrow. Modified by me to include some fixes and improvements
         3. npm run build
         4. 或自行修改代码
         
+![2](https://github.com/user-attachments/assets/443344b5-c61d-4656-a3ae-6bb7a5062e14)
 
-![1](https://github.com/user-attachments/assets/8ce4006d-4b9f-4436-b6bf-12125c343dc0)
+
 
 [Chinese tutorial - see Method 3 for details](https://telegra.ph/Apple-Music-Alac高解析度无损音乐下载教程-04-02-2)
 
