@@ -9,6 +9,7 @@ import (
 	"main/internal/core"
 	"main/internal/metadata"
 	"main/internal/parser"
+	"main/internal/qobuz"
 	"main/internal/ui"
 	"main/internal/utils"
 	"main/utils/lyrics"
@@ -521,6 +522,38 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 	covPath, err := metadata.WriteCover(finalAlbumFolder, "cover", meta.Data[0].Attributes.Artwork.URL)
 	if err != nil {
 	}
+
+	var qobuzDesc string
+	var pdfUrls []qobuz.PDFExtra
+	if !strings.Contains(albumId, "pl.") {
+		qobuzDesc, pdfUrls, err = qobuz.GetQobuzExtras(meta.Data[0].Attributes.ArtistName, meta.Data[0].Attributes.Name)
+		if err != nil {
+			if jsonOutput {
+				printJSON(albumId, 0, "", meta.Data[0].Attributes.Name, "log", 0, "", fmt.Sprintf("Qobuz元数据获取失败: %v", err))
+			} else {
+				fmt.Printf("Qobuz元数据获取失败: %v\n", err)
+			}
+		}
+	}
+
+	if pdfUrls != nil && len(pdfUrls) > 0 {
+		if jsonOutput {
+			printJSON(albumId, 0, "", meta.Data[0].Attributes.Name, "log", 0, "", fmt.Sprintf("正在下载 %d 个 Qobuz PDF...", len(pdfUrls)))
+		} else {
+			fmt.Printf("正在下载 %d 个 Qobuz PDF...\n", len(pdfUrls))
+		}
+		for _, pdf := range pdfUrls {
+			err := qobuz.DownloadPDF(pdf, finalAlbumFolder)
+			if err != nil {
+				if jsonOutput {
+					printJSON(albumId, 0, "", meta.Data[0].Attributes.Name, "log", 0, "", fmt.Sprintf("PDF下载失败: %s -> %v", pdf.URL, err))
+				} else {
+					fmt.Printf("PDF下载失败: %s -> %v\n", pdf.URL, err)
+				}
+			}
+		}
+	}
+
 	if core.Config.SaveAnimatedArtwork && meta.Data[0].Attributes.EditorialVideo.MotionDetailSquare.Video != "" {
 		motionvideoUrlSquare, err := parser.ExtractVideo(meta.Data[0].Attributes.EditorialVideo.MotionDetailSquare.Video)
 		if err == nil {
@@ -827,7 +860,7 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 						}
 					}
 
-					tagErr := metadata.WriteMP4Tags(trackPath, finalLrc, meta, trackIndexInMeta, len(meta.Data[0].Relationships.Tracks.Data))
+					tagErr := metadata.WriteMP4Tags(trackPath, finalLrc, qobuzDesc, meta, trackIndexInMeta, len(meta.Data[0].Relationships.Tracks.Data))
 					if tagErr != nil {
 						postDownloadError = fmt.Errorf("标签写入失败: %w", tagErr)
 					}
