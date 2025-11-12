@@ -58,6 +58,8 @@ type ConfigSet struct {
     FfmpegCheckArgs         string    `yaml:"ffmpeg-check-args"`
     FfmpegEncodeArgs        string    `yaml:"ffmpeg-encode-args"`
 	TxtDownloadThreads      int       `yaml:"txtDownloadThreads"`
+	QobuzUsername           string    `yaml:"qobuz-username"`
+	QobuzPassword           string    `yaml:"qobuz-password"`
 }
 
 type Counter struct {
@@ -546,6 +548,7 @@ type SongLyrics struct {
 		} `json:"attributes"`
 	} `json:"data"`
 }
+
 
 
 
