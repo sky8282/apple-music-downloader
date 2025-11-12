@@ -23,7 +23,7 @@ const (
 	searchURL  = "https://www.qobuz.com/api.json/0.2/catalog/search"
 	albumURL   = "https://www.qobuz.com/api.json/0.2/album/get"
 	tokenFile  = "qobuz_token.json"
-	userAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+	userAgent  = "Mozilla.5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 )
 
 type LoginResponse struct {
@@ -323,15 +323,12 @@ func DownloadPDF(pdf PDFExtra, saveFolder string) error {
 	}
 
 	var filename string
-	if pdf.Title != "" {
-		filename = core.ForbiddenNames.ReplaceAllString(pdf.Title, "_") + ".pdf"
-	} else {
-		urlParts := strings.Split(pdf.URL, "/")
-		filename = urlParts[len(urlParts)-1]
-		if !strings.HasSuffix(filename, ".pdf") {
-			filename += ".pdf"
-		}
+	urlParts := strings.Split(pdf.URL, "/")
+	filename = urlParts[len(urlParts)-1]
+	if !strings.HasSuffix(strings.ToLower(filename), ".pdf") {
+		filename += ".pdf"
 	}
+
 	filename = core.ForbiddenNames.ReplaceAllString(filename, "_")
 
 	base := strings.TrimSuffix(filename, filepath.Ext(filename))
