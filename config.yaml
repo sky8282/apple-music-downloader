@@ -8,13 +8,13 @@ accounts:
     storefront: "cn"     # 账号所属区域 (必须小写, 如 cn, us, jp, hk)
     media-user-token: "your-media-user-token"
     # authorization-token: "your-cn-auth-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
-    decrypt-m3u8-port: "127.0.0.1:10020" # 此账号对应的解密服务端口
-    get-m3u8-port: "127.0.0.1:10021"     # 此账号对应的M3U8获取服务端口
+    decrypt-m3u8-port: "192.168.64.3:10020" # 此账号对应的解密服务端口
+    get-m3u8-port: "192.168.64.3:20020"     # 此账号对应的M3U8获取服务端口
 # ----------------------------------------------------------------
 #  - name: "US"
 #    storefront: "us"
 #    media-user-token: "your-media-user-token"
-#    authorization-token: "your-us-auth-token"
+#    # authorization-token: "your-us-auth-token"
 #    decrypt-m3u8-port: "127.0.0.1:20020"
 #    get-m3u8-port: "127.0.0.1:20021"
 # ----------------------------------------------------------------
@@ -25,6 +25,11 @@ accounts:
 #   decrypt-m3u8-port: "127.0.0.1:30020"
 #   get-m3u8-port: "127.0.0.1:30021"
 # ----------------------------------------------------------------  
+# Qobuz 账号配置 (用于获取PDF和专辑介绍)
+# 使用 (歌手 - 专辑名) 进行搜索，中文的话成功率极其低，尽量让歌手和专辑名为英文，华语歌手尽量使用英文名或者繁体
+qobuz-username: "123456@qq.com" # 你的 Qobuz 邮箱
+qobuz-password: "123456" # 你的 Qobuz 密码
+# ----------------------------------------------------------------
 # 下载保存路径设置
 alac-save-folder: "./music"
 atmos-save-folder: "./music"
@@ -37,9 +42,9 @@ NetworkReadBufferKB: 4096 # kb  #
 # I/O缓冲，过大将导致内存占用过高    #
 BufferSizeKB: 4 # kb            #
 # 下载线程数，最低为 1             #
-aac_downloadthreads: 3          #
-lossless_downloadthreads: 3     #
-hires_downloadthreads: 3        #
+aac_downloadthreads: 3         #
+lossless_downloadthreads: 3    #
+hires_downloadthreads: 3       #
 #################################
 # ---------------------------------------------------------------- 
 # go run main.go 直接回车执行txt模式
@@ -82,7 +87,7 @@ get-m3u8-mode: "hires" # 可选: "all" (获取所有) 或 "hires" (仅探测Hi-R
 aac-type: "aac-lc"        # 可选: "aac-lc", "aac", "aac-binaural", "aac-downmix"
 alac-max: 192000          # 可选: 192000, 96000, 48000, 44100
 atmos-max: 2768           # 可选: 2768, 2448
-download-videos: true     #是否下载视频 true开启，false关闭，需要安装 mp4decrypt 和 media-user-token
+download-videos: true     #是否下载视频 true开启，false关闭
 mv-audio-type: "atmos"    # MV音轨偏好, 可选: "atmos", "ac3", "aac"
 mv-max: 2160              # MV视频分辨率偏好
 
