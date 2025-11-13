@@ -8,8 +8,8 @@ accounts:
     storefront: "cn"     # 账号所属区域 (必须小写, 如 cn, us, jp, hk)
     media-user-token: "your-media-user-token"
     # authorization-token: "your-cn-auth-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
-    decrypt-m3u8-port: "192.168.64.3:10020" # 此账号对应的解密服务端口
-    get-m3u8-port: "192.168.64.3:20020"     # 此账号对应的M3U8获取服务端口
+    decrypt-m3u8-port: "127.0.0.1:10020" # 此账号对应的解密服务端口
+    get-m3u8-port: "127.0.0.1:10021"     # 此账号对应的M3U8获取服务端口
 # ----------------------------------------------------------------
 #  - name: "US"
 #    storefront: "us"
@@ -58,9 +58,10 @@ ffmpeg-check-args: "-v error -f null -"
 #ffmpeg重编码参数，可自行调整
 ffmpeg-encode-args: "-map 0:a -map 0:v -c:a alac -c:v copy -f mp4"
 # ----------------------------------------------------------------  
-# 语言代码, 例如 "zh-CN", "en-US". 留空则自动检测
+# 语言代码, 例如 "zh-CN", "en-GB"，"en-US" 留空则自动检测
 # 各区域支持的语言列表: https://gist.github.com/itouakirai/c8ba9df9dc65bd300094103b058731d0
-language: "" 
+# 尽量使用英文"en-GB" "en-US" 歌手 - 专辑名 匹配 Qobuz
+language: "en-GB" 
 # ---------------------------------------------------------------- 
 # 歌词设置
 # 自动识别链接的区域并使用此区域的账号获取歌词
