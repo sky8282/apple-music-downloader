@@ -1,10 +1,11 @@
 module main
 
-go 1.23.1
+go 1.24.0
+
+toolchain go1.24.2
 
 require (
 	github.com/Eyevinn/mp4ff v0.50.0
-	github.com/abema/go-mp4 v1.4.1
 	github.com/aead/cmac v0.0.0-20160719120800-7af84192f0b1
 	github.com/grafov/m3u8 v0.11.1
 	github.com/schollz/progressbar/v3 v3.14.6
@@ -43,7 +44,7 @@ require (
 	github.com/libdns/libdns v0.2.2 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.9 // indirect
+	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/mholt/acmez/v3 v3.0.0 // indirect
 	github.com/mholt/archives v0.1.0 // indirect
 	github.com/miekg/dns v1.1.62 // indirect
@@ -84,28 +85,30 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
-	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8 // indirect
 	golang.org/x/image v0.23.0 // indirect
-	golang.org/x/mod v0.22.0 // indirect
-	golang.org/x/net v0.34.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/term v0.28.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
-	golang.org/x/tools v0.29.0 // indirect
+	golang.org/x/mod v0.24.0 // indirect
+	golang.org/x/net v0.39.0 // indirect
+	golang.org/x/sync v0.13.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/term v0.31.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
+	golang.org/x/tools v0.32.0 // indirect
 )
 
 require (
 	github.com/beevik/etree v1.3.0
 	github.com/fatih/color v1.18.0
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/sky8282/go-mp4tag v0.0.1
-	github.com/itouakirai/mp4ff v0.0.0-20250925134252-75574f4c6b73
+	github.com/vbauerster/mpb/v8 v8.11.2
+	github.com/zhaarey/go-mp4tag v0.0.0-20250210094042-22578afc09bf
 	gopkg.in/yaml.v2 v2.2.8
 )
 
 require (
-	github.com/google/uuid v1.3.1 // indirect
-	github.com/zhaarey/go-mp4tag v0.0.0-20250210094042-22578afc09bf // indirect
+	github.com/VividCortex/ewma v1.2.0 // indirect
+	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
+	github.com/clipperhouse/stringish v0.1.1 // indirect
+	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
 )
