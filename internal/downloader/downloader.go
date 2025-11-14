@@ -547,12 +547,29 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 			fmt.Printf("正在下载 %d 个 Qobuz PDF...\n", len(pdfUrls))
 		}
 		for _, pdf := range pdfUrls {
-			err := qobuz.DownloadPDF(pdf, finalAlbumFolder)
+			const maxAttempts = 3
+			var err error
+			for attempt := 1; attempt <= maxAttempts; attempt++ {
+				err = qobuz.DownloadPDF(pdf, finalAlbumFolder)
+				if err == nil {
+					break
+				}
+
+				if attempt < maxAttempts {
+					if jsonOutput {
+						printJSON(albumId, 0, "", meta.Data[0].Attributes.Name, "log", 0, "", fmt.Sprintf("PDF下载失败 (尝试 %d/%d), 2秒后重试: %s -> %v", attempt, maxAttempts, pdf.URL, err))
+					} else {
+						fmt.Printf("PDF下载失败 (尝试 %d/%d), 2秒后重试: %s -> %v\n", attempt, maxAttempts, pdf.URL, err)
+					}
+					time.Sleep(2 * time.Second)
+				}
+			}
+
 			if err != nil {
 				if jsonOutput {
-					printJSON(albumId, 0, "", meta.Data[0].Attributes.Name, "log", 0, "", fmt.Sprintf("PDF下载失败: %s -> %v", pdf.URL, err))
+					printJSON(albumId, 0, "", meta.Data[0].Attributes.Name, "log", 0, "", fmt.Sprintf("PDF下载最终失败: %s -> %v", pdf.URL, err))
 				} else {
-					fmt.Printf("PDF下载失败: %s -> %v\n", pdf.URL, err)
+					fmt.Printf("PDF下载最终失败: %s -> %v\n", pdf.URL, err)
 				}
 			}
 		}
