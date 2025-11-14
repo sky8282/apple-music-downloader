@@ -220,9 +220,9 @@ func processURL(urlRaw string, wg *sync.WaitGroup, semaphore chan struct{}, curr
 		}
 		return
 	}
-	var urlArg_i = parse.Query().Get("i")	
+	var urlArg_i = parse.Query().Get("i")
 	err = downloader.Rip(albumId, storefront, urlArg_i, urlRaw, jsonOutput)
-	
+
 	if err != nil {
 		errMsg := fmt.Sprintf("专辑下载失败: %s -> %v", urlRaw, err)
 		if jsonOutput {
@@ -242,19 +242,18 @@ func runDownloads(initialUrls []string, isBatch bool) {
 
 	for _, urlRaw := range initialUrls {
 		if strings.Contains(urlRaw, "/artist/") {
-			if jsonOutput {
-				printJSONError(fmt.Sprintf("JSON 模式下不支持艺术家页面解析: %s", urlRaw))
-				continue
+			if !jsonOutput {
+				fmt.Printf("正在解析歌手页面: %s\n", urlRaw)
 			}
-
-			fmt.Printf("正在解析歌手页面: %s\n", urlRaw)
 			artistAccount := &core.Config.Accounts[0]
 			urlArtistName, urlArtistID, err := api.GetUrlArtistName(urlRaw, artistAccount)
 			if err != nil {
-				fmt.Printf("获取歌手名称失败 for %s: %v\n", urlRaw, err)
+				if !jsonOutput {
+					fmt.Printf("获取歌手名称失败 for %s: %v\n", urlRaw, err)
+				}
 				continue
 			}
-			
+
 			core.Config.ArtistFolderFormat = strings.NewReplacer(
 				"{UrlArtistName}", core.LimitString(urlArtistName),
 				"{ArtistId}", urlArtistID,
@@ -262,18 +261,26 @@ func runDownloads(initialUrls []string, isBatch bool) {
 
 			albumArgs, err := api.CheckArtist(urlRaw, artistAccount, "albums")
 			if err != nil {
-				fmt.Printf("获取歌手专辑失败 for %s: %v\n", urlRaw, err)
+				if !jsonOutput {
+					fmt.Printf("获取歌手专辑失败 for %s: %v\n", urlRaw, err)
+				}
 			} else {
 				finalUrls = append(finalUrls, albumArgs...)
-				fmt.Printf("从歌手 %s 页面添加了 %d 张专辑到队列。\n", urlArtistName, len(albumArgs))
+				if !jsonOutput {
+					fmt.Printf("从歌手 %s 页面添加了 %d 张专辑到队列。\n", urlArtistName, len(albumArgs))
+				}
 			}
 
 			mvArgs, err := api.CheckArtist(urlRaw, artistAccount, "music-videos")
 			if err != nil {
-				fmt.Printf("获取歌手MV失败 for %s: %v\n", urlRaw, err)
+				if !jsonOutput {
+					fmt.Printf("获取歌手MV失败 for %s: %v\n", urlRaw, err)
+				}
 			} else {
 				finalUrls = append(finalUrls, mvArgs...)
-				fmt.Printf("从歌手 %s 页面添加了 %d 个MV到队列。\n", urlArtistName, len(mvArgs))
+				if !jsonOutput {
+					fmt.Printf("从歌手 %s 页面添加了 %d 个MV到队列。\n", urlArtistName, len(mvArgs))
+				}
 			}
 		} else {
 			finalUrls = append(finalUrls, urlRaw)
@@ -291,7 +298,7 @@ func runDownloads(initialUrls []string, isBatch bool) {
 	if isBatch && core.Config.TxtDownloadThreads > 1 {
 		numThreads = core.Config.TxtDownloadThreads
 	}
-	
+
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, numThreads)
 	totalTasks := len(finalUrls)
@@ -299,7 +306,7 @@ func runDownloads(initialUrls []string, isBatch bool) {
 	if !jsonOutput {
 		fmt.Printf("--- 开始下载任务 ---\n总数: %d, 并发数: %d\n--------------------\n", totalTasks, numThreads)
 	}
-	
+
 	for i, urlToProcess := range finalUrls {
 		wg.Add(1)
 		semaphore <- struct{}{}
@@ -370,7 +377,7 @@ func main() {
 			printJSONError("JSON 模式下不支持交互式输入")
 			return
 		}
-		
+
 		fmt.Print("请输入专辑链接或txt文件路径: ")
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')
