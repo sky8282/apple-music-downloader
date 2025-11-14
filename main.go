@@ -114,7 +114,7 @@ func handleSingleMV(urlRaw string) {
 	}
 	sanitizedArtistFolder := core.ForbiddenNames.ReplaceAllString(artistFolder, "_")
 
-	_, err = downloader.MvDownloader(albumId, core.Config.AlacSaveFolder, sanitizedArtistFolder, "", storefront, nil, accountForMV)
+	_, err = downloader.MvDownloader(albumId, core.Config.AlacSaveFolder, sanitizedArtistFolder, "", storefront, nil, accountForMV, nil)
 
 	if err != nil {
 		core.SharedLock.Lock()
