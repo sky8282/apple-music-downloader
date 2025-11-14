@@ -1,5 +1,3 @@
-// renderer.js
-
 const taskBar = document.getElementById('task-bar');
 const queueButton = document.getElementById('queue-button');
 const queueCount = document.getElementById('queue-count');
@@ -26,8 +24,8 @@ let queueLength = 0;
 let clearTaskTimer = null; 
 let currentAlbumTotalTracks = 0;
 
-const MUSIC_URL = 'https://music.apple.com/';
-const CLASSICAL_URL = 'https://classical.music.apple.com/';
+const MUSIC_URL = 'https://music.apple.com/cn/new';
+const CLASSICAL_URL = 'https://classical.music.apple.com/cn';
 
 minimizeButton.addEventListener('click', () => {
     taskBar.classList.add('collapsed');
@@ -150,6 +148,20 @@ window.desktopApp.onGoOutput((message) => {
     let data;
     try { data = JSON.parse(message); } catch (e) { return; }
     if (data.taskId !== currentTaskId) return; 
+
+    if (data.status === 'album-start') {
+        console.log("New album signal received, clearing UI for:", data.albumName);
+        taskDataStore = {}; 
+        trackListContainer.innerHTML = ''; 
+        currentAlbumTotalTracks = data.totalTracks || 0; 
+        
+        albumNameEl.textContent = data.albumName || 'Loading...';
+        currentAlbumName = data.albumName || 'Loading...';
+        albumStatusEl.textContent = `( 0 / ${currentAlbumTotalTracks || '?'} )`;
+        display.classList.remove('idle');
+        
+        return; 
+    }
 
     if (data.albumName && albumNameEl.textContent !== data.albumName) {
         albumNameEl.textContent = data.albumName;
