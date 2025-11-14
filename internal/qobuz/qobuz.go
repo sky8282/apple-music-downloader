@@ -23,7 +23,7 @@ const (
 	searchURL  = "https://www.qobuz.com/api.json/0.2/catalog/search"
 	albumURL   = "https://www.qobuz.com/api.json/0.2/album/get"
 	tokenFile  = "qobuz_token.json"
-	userAgent  = "Mozilla.5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+	userAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 )
 
 type LoginResponse struct {
@@ -244,12 +244,29 @@ func GetQobuzExtras(artistName, albumName string) (string, []PDFExtra, error) {
 		return "", nil, nil
 	}
 
+	primaryArtistName := artistName
+	delimiters := []string{",", "&"}
+	minIndex := -1
+
+	for _, d := range delimiters {
+		if i := strings.Index(primaryArtistName, d); i != -1 {
+			if minIndex == -1 || i < minIndex {
+				minIndex = i
+			}
+		}
+	}
+
+	if minIndex != -1 {
+		primaryArtistName = primaryArtistName[:minIndex]
+	}
+	primaryArtistName = strings.TrimSpace(primaryArtistName)
+
 	authToken, err := getValidToken(core.Config.QobuzUsername, core.Config.QobuzPassword)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to get Qobuz token: %w", err)
 	}
 
-	searchQuery := fmt.Sprintf("%s %s", artistName, albumName)
+	searchQuery := fmt.Sprintf("%s %s", primaryArtistName, albumName)
 	searchResp, err := searchQobuz(authToken, searchQuery, 10)
 	if err != nil {
 		return "", nil, fmt.Errorf("Qobuz search failed: %w", err)
@@ -262,7 +279,7 @@ func GetQobuzExtras(artistName, albumName string) (string, []PDFExtra, error) {
 	var matchedAlbumID string
 	for _, album := range searchResp.Albums.Items {
 		if strings.EqualFold(strings.TrimSpace(album.Title), strings.TrimSpace(albumName)) &&
-			strings.EqualFold(strings.TrimSpace(album.Artist.Name), strings.TrimSpace(artistName)) {
+			(strings.EqualFold(strings.TrimSpace(album.Artist.Name), strings.TrimSpace(primaryArtistName)) || strings.EqualFold(strings.TrimSpace(album.Artist.Name), strings.TrimSpace(artistName))) {
 			matchedAlbumID = album.ID
 			break
 		}
