@@ -11,12 +11,12 @@ accounts:
     decrypt-m3u8-port: "127.0.0.1:10020" # 此账号对应的解密服务端口
     get-m3u8-port: "127.0.0.1:10021"     # 此账号对应的M3U8获取服务端口
 # ----------------------------------------------------------------
-#  - name: "US"
-#    storefront: "us"
-#    media-user-token: "your-media-user-token"
-#    # authorization-token: "your-us-auth-token"
-#    decrypt-m3u8-port: "127.0.0.1:20020"
-#    get-m3u8-port: "127.0.0.1:20021"
+# - name: "US"
+#   storefront: "us"
+#   media-user-token: "your-media-user-token"
+#   # authorization-token: "your-us-auth-token"
+#   decrypt-m3u8-port: "127.0.0.1:20020"
+#   get-m3u8-port: "127.0.0.1:20021"
 # ----------------------------------------------------------------
 # - name: "JP"
 #   storefront: "jp"
