@@ -1,9 +1,8 @@
-// main.js
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
-const MUSIC_URL = 'https://music.apple.com/';
+const MUSIC_URL = 'https://music.apple.com/cn/new';
 
 let win; 
 let taskbarWin; 
@@ -13,11 +12,258 @@ let taskQueue = [];
 let activeTask = null; 
 let taskIdCounter = 0;
 
+let globalAppleAuthToken = null;
+
 const TASKBAR_HEIGHT_NORMAL = 200;
 const TASKBAR_HEIGHT_COLLASPED = 38;
 let isTaskbarMinimized = true;
 
 let userConfigPath = '';
+
+function fetchNet(url, options = {}) {
+    return new Promise((resolve, reject) => {
+        const request = net.request({
+            url: url,
+            method: options.method || 'GET',
+            headers: options.headers || {},
+        });
+
+        if (options.headers && options.headers['Range']) {
+            request.setHeader('Range', options.headers['Range']);
+        }
+
+        request.on('response', (response) => {
+            const chunks = [];
+            response.on('data', (chunk) => {
+                chunks.push(chunk);
+            });
+            response.on('end', () => {
+                const buffer = Buffer.concat(chunks);
+                const body = options.responseType === 'arraybuffer' ? buffer : buffer.toString();
+                
+                resolve({
+                    text: () => Promise.resolve(body),
+                    json: () => Promise.resolve(JSON.parse(body)),
+                    arrayBuffer: () => Promise.resolve(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)),
+                    status: response.statusCode,
+                });
+            });
+            response.on('error', reject);
+        });
+
+        request.on('error', reject);
+        request.end();
+    });
+}
+
+async function getAppleAuthToken(webContents) {
+    if (globalAppleAuthToken) {
+        return globalAppleAuthToken;
+    }
+    
+    try {
+        const scriptSrc = await webContents.executeJavaScript(`
+            document.querySelector("script[type='module']")?.src;
+        `);
+
+        if (!scriptSrc) {
+            console.log('[Main] 未找到 Token 脚本');
+            return null;
+        }
+
+        const text = await (await fetchNet(scriptSrc)).text();
+        const match = text.match(/"(eyJhbGciOiJ.+?)"/);
+        
+        if (match && match[1]) {
+            console.log('[Main] Apple Auth Token 已获取');
+            globalAppleAuthToken = match[1];
+            return globalAppleAuthToken;
+        }
+    } catch (e) {
+        console.error('[Main] 获取 Apple Auth Token 失败:', e);
+    }
+    return null;
+}
+
+async function getAlbumInfo(albumId, storefront, token) {
+    storefront = storefront || 'cn';
+    const url = `https://amp-api.music.apple.com/v1/catalog/${storefront}/albums/${albumId}?extend=extendedAssetUrls`;
+    const headers = {
+        'Origin': 'https://music.apple.com',
+        'Referer': 'https://music.apple.com/',
+        'Authorization': `Bearer ${token}`
+    };
+    
+    try {
+        const response = await fetchNet(url, { headers });
+        if (response.status === 404) {
+            return null;
+        }
+        const data = await response.json();
+        return data.data[0];
+    } catch (e) {
+        console.error(`[Main] getAlbumInfo 失败: ${e.message}`);
+        return null;
+    }
+}
+
+ipcMain.on('request-album-info', async (event, albumId) => {
+    const token = globalAppleAuthToken || await getAppleAuthToken(win.webContents);
+    if (!token) {
+        console.error('[Main] 无法获取 Token, 无法检查专辑信息');
+        return;
+    }
+    
+    const storefront = currentServiceUrl.split('/')[3] || 'cn';
+    const albumData = await getAlbumInfo(albumId, storefront, token);
+    
+    if (!albumData || !albumData.attributes) {
+        return;
+    }
+
+    const { audioTraits, isMasteredForItunes } = albumData.attributes;
+    
+    if (win) {
+        win.webContents.send('album-info-result', { audioTraits, isMasteredForItunes });
+    }
+});
+
+
+const r0 = ["ec+3", "alac", "aac ", "aach"];
+const i0 = ["BINAURAL", "DOWNMIX"];
+
+function sortQualities(t, e) {
+    return r0.indexOf(t["AUDIO-FORMAT-ID"]) - r0.indexOf(e["AUDIO-FORMAT-ID"]) || e["BIT-DEPTH"] - t["BIT-DEPTH"] || e["SAMPLE-RATE"] - t["SAMPLE-RATE"] || (e["BIT-RATE"] ?? NaN) - (t["BIT-RATE"] ?? NaN) || i0.indexOf(t["CHANNEL-USAGE"] ?? "") - i0.indexOf(e["CHANNEL-USAGE"] ?? "");
+}
+
+function formatQualityString(t, e) {
+    const n = [];
+    return n.push(t["AUDIO-FORMAT-ID"]), t["CHANNEL-COUNT"] && n.push(`${t["CHANNEL-COUNT"]}ch`), t["BIT-RATE"] && n.push(`${Math.floor(Number(t["BIT-RATE"]) / 1e3)}kbps`), t["BIT-DEPTH"] && n.push(`${t["BIT-DEPTH"]}bit`), t["SAMPLE-RATE"] && n.push(`${Math.floor(Number(t["SAMPLE-RATE"]) / 1e3)}kHz`), t["CHANNEL-USAGE"] && n.push(t["CHANNEL-USAGE"].toLowerCase()), t["IS-ATMOS"] && n.push("atmos"), e && sortQualities(t, e) === 0 ? n.push("[REAL]") : e && (n.push("➤"), n.push(formatQualityString(e)), n.push("[REAL]")), n.join("  ");
+}
+
+function formatQualityStrings(t) {
+    return t.map(e => formatQualityString(e, e.__REAL__)).join(`\n`);
+}
+
+async function parseAlacHeader(t, e) {
+    try {
+        const n = await fetchNet(`${t}/${e}`, {
+            headers: { 'Range': 'bytes=0-16384' },
+            responseType: 'arraybuffer'
+        });
+        const r = new DataView(await n.arrayBuffer());
+        if (r.getInt32(4) !== 1718909296 || r.getInt32(8) !== 1769172789) return null;
+        let i = 0, o = 0;
+        for (; i < r.byteLength;) {
+            const s = r.getInt32(i);
+            switch (r.getInt32(i + 4)) {
+                case 1836019574: case 1953653099: case 1835297121: case 1835626086: case 1937007212:
+                    i += 8;
+                    break;
+                case 1937011556:
+                    i += 16;
+                    break;
+                case 1701733217:
+                    i += 36;
+                case 1634492771:
+                    return {
+                        "FIRST-SEGMENT-URI": e,
+                        "AUDIO-FORMAT-ID": "alac",
+                        "CHANNEL-COUNT": r.getUint8(i + 8 + 13).toString(),
+                        "BIT-DEPTH": r.getUint8(i + 8 + 9),
+                        "SAMPLE-RATE": r.getInt32(i + 8 + 24),
+                        __REAL__: null
+                    };
+                default:
+                    i += s;
+                    break;
+            }
+            if (o++ > 100) break;
+        }
+    } catch (err) {
+        console.error(`[Main] parseAlacHeader 失败: ${err.message}`);
+    }
+    return null;
+}
+
+ipcMain.on('request-album-tracks-quality', async (event, albumId) => {
+    const token = globalAppleAuthToken || await getAppleAuthToken(win.webContents);
+    if (!token) {
+        console.error('[Main] 无法获取 Token, 无法检查音质');
+        return;
+    }
+    
+    const storefront = currentServiceUrl.split('/')[3] || 'cn';
+    const albumData = await getAlbumInfo(albumId, storefront, token);
+    
+    if (!albumData || !albumData.relationships || !albumData.relationships.tracks) {
+        return;
+    }
+    
+    const qualityResults = [];
+    const tracks = albumData.relationships.tracks.data;
+
+    for (const track of tracks) {
+        if (track.type !== "songs") {
+            qualityResults.push("N/A");
+            continue;
+        }
+        if (!track.attributes.extendedAssetUrls) {
+            qualityResults.push("[unavailable]");
+            continue;
+        }
+        const hlsUrl = track.attributes.extendedAssetUrls.enhancedHls;
+        if (!hlsUrl) {
+            qualityResults.push("[lossy]");
+            continue;
+        }
+
+        try {
+            const manifestText = await (await fetchNet(hlsUrl)).text();
+            let audioMetadata = null;
+            for (const line of manifestText.split('\n')) {
+                if (line.startsWith('#EXT-X-SESSION-DATA:DATA-ID="com.apple.hls.audioAssetMetadata"')) {
+                    audioMetadata = JSON.parse(Buffer.from(line.split("VALUE=")[1].slice(1, -1), 'base64').toString());
+                    break;
+                }
+            }
+
+            if (!audioMetadata) {
+                qualityResults.push("[metadata_error]");
+                continue;
+            }
+
+            const qualities = Object.values(audioMetadata);
+            qualities.sort(sortQualities);
+            
+            const baseUrl = hlsUrl.split("/").slice(0, -1).join("/");
+            for (const quality of qualities) {
+                if (quality["AUDIO-FORMAT-ID"] === "alac") {
+                    quality.__REAL__ = await parseAlacHeader(baseUrl, quality["FIRST-SEGMENT-URI"]);
+                }
+            }
+
+            const stereoQualities = qualities.filter(q => parseInt(q["CHANNEL-COUNT"]) <= 2);
+            const spatialQualities = qualities.filter(q => parseInt(q["CHANNEL-COUNT"]) > 2);
+
+            let qualityString = formatQualityStrings(stereoQualities);
+            if (spatialQualities.length > 0) {
+                qualityString += `<br>${formatQualityStrings(spatialQualities)}`;
+            }
+            
+            qualityResults.push(qualityString);
+
+        } catch (e) {
+            console.error(`[Main] 处理音质失败 track ${track.id}: ${e.message}`);
+            qualityResults.push("[fetch_error]");
+        }
+    }
+    
+    if (win) {
+        win.webContents.send('album-quality-result', qualityResults);
+    }
+});
+
 
 function manageConfig() {
     try {
@@ -64,6 +310,7 @@ function createMainWindow(urlToLoad) {
     currentServiceUrl = urlToLoad; 
 
     win.webContents.on('did-finish-load', () => {
+        getAppleAuthToken(win.webContents);
         fs.readFile(path.join(__dirname, 'injector.js'), 'utf-8', (err, script) => {
             if (err) { console.error('无法加载 injector.js', err); return; }
             win.webContents.executeJavaScript(script);
@@ -165,7 +412,7 @@ ipcMain.on('switch-service', (event, urlToLoad) => {
     }
 });
 
-function addTask(url, name) {
+function addTask(url, name, downloadType = 'normal') {
     if (activeTask && activeTask.url === url) {
         console.log(`[Main] 忽略重复任务 (已在运行): ${url}`);
         return; 
@@ -186,7 +433,9 @@ function addTask(url, name) {
         completedTracks: 0,
         totalTracks: 0,
         taskDataStore: {},
-        process: null
+        process: null,
+        downloadType: downloadType || 'normal',
+        currentAlbumId: null
     };
     
     console.log(`[Main] 添加新任务到队列: ${newTask.name}`); 
@@ -199,9 +448,9 @@ function addTask(url, name) {
     }
 }
 
-ipcMain.on('start-download', (event, { url, details }) => {
+ipcMain.on('start-download', (event, { url, details, downloadType }) => {
     if (win && event.sender === win.webContents) { 
-        addTask(url, details.name || url.split('/').pop());
+        addTask(url, details.name || url.split('/').pop(), downloadType);
     }
 });
 
@@ -355,6 +604,13 @@ function processQueue() {
     if (isDev) {
         console.log('[Main] DEV Mode: Spawning with `go run main.go`');
         const goArgs = ['run', 'main.go', '--json-output', '--config', userConfigPath];
+        
+        if (activeTask.downloadType === 'atmos') {
+            goArgs.push('--atmos');
+        } else if (activeTask.downloadType === 'all-album') {
+            goArgs.push('--all-album');
+        }
+        
         if (activeTask.url.includes('?i=') || activeTask.url.includes('/song/')) {
             goArgs.push('--song');
         }
@@ -380,6 +636,12 @@ function processQueue() {
 
         const binaryPath = path.join(goBinDir, binaryName);
         const goArgs = ['--json-output', '--config', userConfigPath];
+        
+        if (activeTask.downloadType === 'atmos') {
+            goArgs.push('--atmos');
+        } else if (activeTask.downloadType === 'all-album') {
+            goArgs.push('--all-album');
+        }
 
         if (activeTask.url.includes('?i=') || activeTask.url.includes('/song/')) {
             goArgs.push('--song');
@@ -426,6 +688,25 @@ function processQueue() {
                     json.albumName = taskToRun.name; 
                 }
 
+                if (json.trackNum !== undefined && json.trackNum > 0) {
+                    
+                    if (json.albumId && json.albumId !== taskToRun.currentAlbumId) {
+                        console.log(`[Main ${taskToRun.id}] New album detected by ID change: ${json.albumName}`);
+                        taskToRun.completedTracks = 0;
+                        taskToRun.totalTracks = 0; 
+                        taskToRun.taskDataStore = {};
+                        taskToRun.currentAlbumId = json.albumId;
+                        
+                        broadcast('go-output', JSON.stringify({
+                            taskId: taskToRun.id,
+                            status: 'album-start', 
+                            albumName: json.albumName,
+                            albumId: json.albumId,
+                            totalTracks: 0 
+                        }));
+                    }
+                }
+                
                 broadcast('go-output', JSON.stringify(json));
                 
                 if (json.trackNum !== undefined && json.trackNum > 0) {
@@ -465,7 +746,7 @@ function processQueue() {
         
         if (activeTask && activeTask.id === taskToRun.id) {
             taskToRun.status = 'finished';
-            broadcast('task-finished', taskToRun.id);
+            broadcast('task-finished', activeTask.id);
             activeTask = null; 
             broadcastQueueUpdate();
             
