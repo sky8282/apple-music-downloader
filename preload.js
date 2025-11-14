@@ -1,8 +1,7 @@
-// preload.js
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktopApp', {
-    download: (url, details) => {
-        ipcRenderer.send('start-download', { url, details });
+    download: (url, details, downloadType) => {
+        ipcRenderer.send('start-download', { url, details, downloadType });
     },
     downloadUrl: (url) => {
         ipcRenderer.send('start-download-url', url);
@@ -18,6 +17,13 @@ contextBridge.exposeInMainWorld('desktopApp', {
     onSetTaskbarState: (callback) => ipcRenderer.on('set-taskbar-state', (e, isMinimized) => callback(isMinimized)),
     onSetActiveService: (callback) => ipcRenderer.on('set-active-service', (e, url) => callback(url)),
     onSetQueueLength: (callback) => ipcRenderer.on('set-queue-length', (e, len) => callback(len)),
+    
+    requestAlbumTracksQuality: (albumId) => ipcRenderer.send('request-album-tracks-quality', albumId),
+    onAlbumQualityResult: (callback) => ipcRenderer.on('album-quality-result', (e, data) => callback(data)),
+
+    requestAlbumInfo: (albumId) => ipcRenderer.send('request-album-info', albumId),
+    onAlbumInfoResult: (callback) => ipcRenderer.on('album-info-result', (e, data) => callback(data)),
+
     switchService: (url) => ipcRenderer.send('switch-service', url),
     cancelTask: (taskId) => ipcRenderer.send('cancel-task', taskId),
     navigateBack: () => ipcRenderer.send('navigate-back'),
