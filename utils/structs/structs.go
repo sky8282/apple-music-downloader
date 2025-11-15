@@ -60,6 +60,8 @@ type ConfigSet struct {
 	TxtDownloadThreads      int       `yaml:"txtDownloadThreads"`
 	QobuzUsername           string    `yaml:"qobuz-username"`
 	QobuzPassword           string    `yaml:"qobuz-password"`
+	EnableCdnOverride       bool      `yaml:"enable-cdn-override"`
+	CdnIp                   string    `yaml:"cdn-ip"`
 }
 
 type Counter struct {
@@ -548,7 +550,6 @@ type SongLyrics struct {
 		} `json:"attributes"`
 	} `json:"data"`
 }
-
 
 
 
