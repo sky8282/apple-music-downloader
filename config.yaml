@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------
 # 账号配置列表 (Account Configuration List)
 # 在此列表中配置您的所有账号。下载专辑时，程序将从此列表中轮流选取账号进行并行解密。
-# 下载单曲时，程序将根据链接的区域 (如 /cn/, /us/) 自动匹配拥有相同 "storefront" 值的账号。
+# 下载单曲时，程序将根据链接的区域 (如 /cn/, /us/) 自动匹配拥有相同 "storefront" 值的账号
 # ----------------------------------------------------------------
 accounts:
   - name: "CN"           # 账号名称，方便识别
@@ -14,7 +14,7 @@ accounts:
 # - name: "US"
 #   storefront: "us"
 #   media-user-token: "your-media-user-token"
-#   # authorization-token: "your-us-auth-token"
+#   authorization-token: "your-us-auth-token"
 #   decrypt-m3u8-port: "127.0.0.1:20020"
 #   get-m3u8-port: "127.0.0.1:20021"
 # ----------------------------------------------------------------
@@ -25,14 +25,24 @@ accounts:
 #   decrypt-m3u8-port: "127.0.0.1:30020"
 #   get-m3u8-port: "127.0.0.1:30021"
 # ----------------------------------------------------------------  
-# Qobuz 账号配置 (用于获取PDF和专辑介绍)
-# 使用 (歌手 - 专辑名) 进行搜索，中文的话成功率极其低，尽量让歌手和专辑名为英文，华语歌手尽量使用英文名或者繁体
+# Qobuz 账号配置 (用于获取PDF和专辑介绍)，尽量使用 fr 法区
 qobuz-username: "123456@qq.com" # 你的 Qobuz 邮箱
 qobuz-password: "123456" # 你的 Qobuz 密码
 # ----------------------------------------------------------------
 # 下载保存路径设置
 alac-save-folder: "./music"
 atmos-save-folder: "./music"
+# ----------------------------------------------------------------
+# 是否开启 CDN true 开启，false 关闭
+# 开启后, 将把 aod.itunes.apple.com 的流量重定向到下面指定的CDN
+enable-cdn-override: true
+
+# CDN IP 地址，留空则不生效
+# 台湾 17.253.117.201，17.253.117.202，17.253.117.203
+# 香港 17.253.85.201，17.253.85.202，17.253.85.203，17.253.85.204，17.253.85.205，17.253.85.206，17.253.87.195，17.253.87.196，17.253.87.201，17.253.87.203
+# 日本 17.253.69.200，17.253.69.202，17.253.75.201，17.253.75.202
+cdn-ip: "17.253.117.201"
+# ----------------------------------------------------------------
 #################################
 #经常下载失败请按自身网络环境调整参数 #
 # m3u8切片数量。                  #
@@ -60,7 +70,7 @@ ffmpeg-encode-args: "-map 0:a -map 0:v -c:a alac -c:v copy -f mp4"
 # ----------------------------------------------------------------  
 # 语言代码, 例如 "zh-CN", "en-GB"，"en-US" 留空则自动检测
 # 各区域支持的语言列表: https://gist.github.com/itouakirai/c8ba9df9dc65bd300094103b058731d0
-# 尽量使用英文"en-GB" "en-US" 歌手 - 专辑名 匹配 Qobuz
+# 尽量使用英文"en-GB" "en-US" 歌手 - 专辑名 去匹配 Qobuz
 language: "en-GB" 
 # ---------------------------------------------------------------- 
 # 歌词设置
@@ -68,9 +78,9 @@ language: "en-GB"
 # 当发起任务的链接区域不在账号列表时,可选账号列表下的区域为默认下载歌词区域
 default-lyric-storefront: "cn"
 # ---------------------------------------------------------------- 
-lrc-type: "lyrics"   # 可选: "lyrics" (普通歌词) 或 "syllable-lyrics" (逐字歌词)
-lrc-format: "lrc"    # 可选: "lrc" 或 "ttml"
-embed-lrc: true      # 是否将歌词嵌入音频文件
+lrc-type: "lyrics"    # 可选: "lyrics" (普通歌词) 或 "syllable-lyrics" (逐字歌词)
+lrc-format: "lrc"     # 可选: "lrc" 或 "ttml"
+embed-lrc: true       # 是否将歌词嵌入音频文件
 save-lrc-file: false  # 是否将歌词另存为 .lrc 文件
 
 # 封面与插图设置
@@ -83,12 +93,12 @@ emby-animated-artwork: false    # 需要 ffmpeg
 
 # M3U8 获取模式
 get-m3u8-from-device: true
-get-m3u8-mode: "hires" # 可选: "all" (获取所有) 或 "hires" (仅探测Hi-Res)
+get-m3u8-mode: "hires"    # 可选: "all" (获取所有) 或 "hires" (仅探测Hi-Res)
 # 音频格式偏好
 aac-type: "aac-lc"        # 可选: "aac-lc", "aac", "aac-binaural", "aac-downmix"
 alac-max: 192000          # 可选: 192000, 96000, 48000, 44100
 atmos-max: 2768           # 可选: 2768, 2448
-download-videos: true     #是否下载视频 true开启，false关闭
+download-videos: true     #是否下载视频 true开启，false关闭，需有效的 your-media-user-token
 mv-audio-type: "atmos"    # MV音轨偏好, 可选: "atmos", "ac3", "aac"
 mv-max: 2160              # MV视频分辨率偏好
 
