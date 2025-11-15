@@ -141,6 +141,13 @@ func LoadConfig(configPath string) error {
 		}
 	}
 
+	if Config.EnableCdnOverride && Config.CdnIp != "" {
+		fmt.Printf("%s%s\n",
+			green("CDN 劫持已启用, 目标 IP: "),
+			red(Config.CdnIp),
+		)
+	}
+
 	if *Alac_max == 0 {
 		Alac_max = &Config.AlacMax
 	}
