@@ -3,6 +3,7 @@ package runv14
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -31,13 +32,13 @@ type ProgressUpdate struct {
 	Stage      string
 }
 
-func getRemoteFileSize(fileUrl string, header http.Header) (int64, error) {
+func getRemoteFileSize(fileUrl string, header http.Header, httpClient *http.Client) (int64, error) {
 	req, err := http.NewRequest("HEAD", fileUrl, nil)
 	if err != nil {
 		return 0, err
 	}
 	req.Header = header.Clone()
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return 0, err
 	}
@@ -51,7 +52,7 @@ func getRemoteFileSize(fileUrl string, header http.Header) (int64, error) {
 	}
 	return size, nil
 }
-func downloadChunk(wg *sync.WaitGroup, errChan chan error, progressBytes chan int64, fileUrl string, header http.Header, tempFile *os.File, chunkIndex int, start, end int64, Config structs.ConfigSet) {
+func downloadChunk(wg *sync.WaitGroup, errChan chan error, progressBytes chan int64, fileUrl string, header http.Header, tempFile *os.File, chunkIndex int, start, end int64, Config structs.ConfigSet, httpClient *http.Client) {
 	defer wg.Done()
 
 	req, err := http.NewRequest("GET", fileUrl, nil)
@@ -63,8 +64,7 @@ func downloadChunk(wg *sync.WaitGroup, errChan chan error, progressBytes chan in
 	req.Header = header.Clone()
 	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		errChan <- fmt.Errorf("chunk %d: request failed: %w", chunkIndex, err)
 		return
@@ -101,7 +101,7 @@ func downloadChunk(wg *sync.WaitGroup, errChan chan error, progressBytes chan in
 		}
 	}
 }
-func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, numChunks int, progressChan chan ProgressUpdate, Config structs.ConfigSet) (*os.File, error) {
+func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, numChunks int, progressChan chan ProgressUpdate, Config structs.ConfigSet, httpClient *http.Client) (*os.File, error) {
 	tempFile, err := os.CreateTemp("", "amdl-*.tmp")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp file: %w", err)
@@ -146,7 +146,7 @@ func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, n
 			end = totalSize - 1
 		}
 		wg.Add(1)
-		go downloadChunk(&wg, errChan, progressBytes, fileUrl, header, tempFile, i, start, end, Config)
+		go downloadChunk(&wg, errChan, progressBytes, fileUrl, header, tempFile, i, start, end, Config, httpClient)
 	}
 
 	wg.Wait()
@@ -165,6 +165,32 @@ func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, n
 
 func Run(adamId string, playlistUrl string, outfile string, account *structs.Account, Config structs.ConfigSet, progressChan chan ProgressUpdate) error {
 	header := make(http.Header)
+
+	var httpClient *http.Client
+	if Config.EnableCdnOverride && Config.CdnIp != "" {
+		dialer := &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					if strings.Contains(addr, "aod.itunes.apple.com") {
+						addr = Config.CdnIp + ":443"
+					}
+					return dialer.DialContext(ctx, network, addr)
+				},
+				ForceAttemptHTTP2:     true,
+				MaxIdleConns:          100,
+				IdleConnTimeout:       90 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		}
+	} else {
+		httpClient = &http.Client{}
+	}
 
 	req, err := http.NewRequest("GET", playlistUrl, nil)
 	if err != nil {
@@ -199,7 +225,7 @@ func Run(adamId string, playlistUrl string, outfile string, account *structs.Acc
 	}
 	fileUrlStr := fileUrl.String()
 
-	totalSize, err := getRemoteFileSize(fileUrlStr, header)
+	totalSize, err := getRemoteFileSize(fileUrlStr, header, httpClient)
 	if err != nil {
 		return fmt.Errorf("could not get file size: %w", err)
 	}
@@ -208,7 +234,7 @@ func Run(adamId string, playlistUrl string, outfile string, account *structs.Acc
 	if numChunks <= 0 {
 		numChunks = 10
 	}
-	tempFile, err := downloadFileInChunks(fileUrlStr, header, totalSize, numChunks, progressChan, Config)
+	tempFile, err := downloadFileInChunks(fileUrlStr, header, totalSize, numChunks, progressChan, Config, httpClient)
 	if err != nil {
 		return fmt.Errorf("failed to download file in chunks: %w", err)
 	}
@@ -732,4 +758,3 @@ func RunOrchestrated(adamId string, playlistUrl string, targetStorefront string,
 	fmt.Println("##################################################")
 	return fmt.Errorf("所有服务均操作失败，最后一次的错误为: %w", lastError)
 }
-
