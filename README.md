@@ -43,9 +43,11 @@ Original script by Sorrow. Modified by me to include some fixes and improvements
     3. 根目录下执行  npm start     开始运行
     4. 需要打包成桌面APP的话：
         1. go build -ldflags="-s -w" -o downloader main.go 打包go为二进制文件，文件名 downloader
-        2. 放入二进制 MP4Box，  mp4decrypt，  ffmpeg 并给权限如：macos/linux  chmod +x
-        3. npm run build
-        4. 或自行修改代码
+        2. 放入二进制 MP4Box，  mp4decrypt，  ffmpeg 并给权限如：macos/linux  chmod +x 给权限
+        3. 打包
+            1. npm install -g electron  
+            2. npm run build  
+    5. 或自行修改代码
         
 ![2](https://github.com/user-attachments/assets/443344b5-c61d-4656-a3ae-6bb7a5062e14)
 
