@@ -528,9 +528,20 @@ ipcMain.on('cancel-task', (event, taskId) => {
     setTimeout(processQueue, 0);
 });
 
-ipcMain.on('navigate-back', () => win && win.webContents.goBack()); 
-ipcMain.on('navigate-fwd', () => win && win.webContents.goForward()); 
+ipcMain.on('navigate-back', () => {
+    if (win && win.webContents.navigationHistory.canGoBack()) {
+        win.webContents.navigationHistory.goBack();
+    }
+});
+
+ipcMain.on('navigate-fwd', () => {
+    if (win && win.webContents.navigationHistory.canGoForward()) {
+        win.webContents.navigationHistory.goForward();
+    }
+});
+
 ipcMain.on('refresh-page', () => win && win.webContents.reloadIgnoringCache());
+
 ipcMain.on('open-config', () => {
     if (userConfigPath) {
         shell.openPath(userConfigPath);
