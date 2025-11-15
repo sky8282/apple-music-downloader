@@ -98,7 +98,7 @@ get-m3u8-mode: "hires"    # 可选: "all" (获取所有) 或 "hires" (仅探测H
 aac-type: "aac-lc"        # 可选: "aac-lc", "aac", "aac-binaural", "aac-downmix"
 alac-max: 192000          # 可选: 192000, 96000, 48000, 44100
 atmos-max: 2768           # 可选: 2768, 2448
-download-videos: true     #是否下载视频 true开启，false关闭，需有效的 your-media-user-token
+download-videos: true     #是否下载视频 true开启，false关闭，需有效的 your-media-user-token 和 mp4decrypt 工具
 mv-audio-type: "atmos"    # MV音轨偏好, 可选: "atmos", "ac3", "aac"
 mv-max: 2160              # MV视频分辨率偏好
 
