@@ -1,36 +1,31 @@
 package runv3
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
-	"path/filepath"
-
-	"github.com/sky8282/requests"
-	"google.golang.org/protobuf/proto"
-
-	//"log/slog"
+	"io"
+	"main/internal/core"
 	cdm "main/utils/runv3/cdm"
 	key "main/utils/runv3/key"
-	"os"
-
-	"bytes"
-	"errors"
-	"io"
-
-	"github.com/Eyevinn/mp4ff/mp4"
-	//"github.com/itouakirai/mp4ff/mp4"
-
-	//"io/ioutil"
-	"encoding/json"
+	"net"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
-	//"time"
+	"time"
 
+	"github.com/Eyevinn/mp4ff/mp4"
+	"github.com/fatih/color"
 	"github.com/grafov/m3u8"
 	"github.com/schollz/progressbar/v3"
+	"github.com/sky8282/requests"
+	"google.golang.org/protobuf/proto"
 )
 
 type PlaybackLicense struct {
@@ -38,6 +33,93 @@ type PlaybackLicense struct {
 	License    string `json:"license"`
 	RenewAfter int    `json:"renew-after"`
 	Status     int    `json:"status"`
+}
+
+var (
+	globalClient *http.Client
+	clientOnce   sync.Once
+)
+
+func getHijackedClient() *http.Client {
+	clientOnce.Do(func() {
+		poolSize := 20
+
+		proxyFunc := http.ProxyFromEnvironment
+		if core.Config.EnableCdnOverride {
+			proxyFunc = nil
+		}
+
+		t := &http.Transport{
+			Proxy:                 proxyFunc,
+			MaxIdleConnsPerHost:   poolSize,
+			MaxIdleConns:          poolSize * 2,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			ForceAttemptHTTP2:     true,
+		}
+
+		if core.Config.EnableCdnOverride && core.Config.CdnIp != "" {
+			dialer := &net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}
+
+			var audioCdnIp, mvCdnIp string
+			if strings.Contains(core.Config.CdnIp, ",") {
+				parts := strings.Split(core.Config.CdnIp, ",")
+				audioCdnIp = strings.TrimSpace(parts[0])
+				if len(parts) > 1 {
+					mvCdnIp = strings.TrimSpace(parts[1])
+				}
+			} else {
+				audioCdnIp = core.Config.CdnIp
+				mvCdnIp = core.Config.CdnIp
+			}
+
+			green := color.New(color.FgGreen).SprintFunc()
+			cyan := color.New(color.FgCyan).SprintFunc()
+			yellow := color.New(color.FgYellow).SprintFunc()
+
+			t.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				host, port, err := net.SplitHostPort(addr)
+				if err != nil {
+					host = addr
+					port = "443"
+				}
+
+				targetIp := ""
+				isHijacked := false
+				hijackType := ""
+
+				if audioCdnIp != "" && strings.Contains(host, "aod.itunes.apple.com") {
+					targetIp = audioCdnIp
+					isHijacked = true
+					hijackType = "Audio"
+				}
+
+				if !isHijacked && mvCdnIp != "" {
+					if strings.Contains(host, "mvod.itunes.apple.com") || strings.Contains(host, "mvod") {
+						targetIp = mvCdnIp
+						isHijacked = true
+						hijackType = "Video"
+					}
+				}
+
+				if isHijacked {
+					fmt.Printf("%s [%s] %s -> %s\n", green("[CDN劫持]"), yellow(hijackType), host, cyan(targetIp))
+					addr = net.JoinHostPort(targetIp, port)
+				}
+
+				return dialer.DialContext(ctx, network, addr)
+			}
+		}
+
+		globalClient = &http.Client{
+			Transport: t,
+		}
+	})
+	return globalClient
 }
 
 func getPSSH(contentId string, kidBase64 string) (string, error) {
@@ -58,7 +140,7 @@ func getPSSH(contentId string, kidBase64 string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal WidevineCencHeader: %v", err)
 	}
-	//最前面添加32字节
+
 	widevineCenc = append([]byte("0123456789abcdef0123456789abcdef"), widevineCenc...)
 	pssh := base64.StdEncoding.EncodeToString(widevineCenc)
 	return pssh, nil
@@ -97,6 +179,7 @@ func AfterRequest(Response *requests.Response) ([]byte, error) {
 	}
 	return License, nil
 }
+
 func GetWebplayback(adamId string, authtoken string, mutoken string, mvmode bool) (string, string, error) {
 	url := "https://play.music.apple.com/WebObjects/MZPlay.woa/wa/webPlayback"
 	postData := map[string]string{
@@ -118,17 +201,13 @@ func GetWebplayback(adamId string, authtoken string, mutoken string, mvmode bool
 	req.Header.Set("Referer", "https://music.apple.com/")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authtoken))
 	req.Header.Set("x-apple-music-user-token", mutoken)
-	// 创建 HTTP 客户端
-	//client := &http.Client{}
-	resp, err := http.DefaultClient.Do(req)
-	// 发送请求
-	//resp, err := client.Do(req)
+	resp, err := getHijackedClient().Do(req)
+
 	if err != nil {
 		fmt.Println("Error sending request:", err)
 		return "", "", err
 	}
 	defer resp.Body.Close()
-	//fmt.Println("Response Status:", resp.Status)
 	obj := new(Songlist)
 	err = json.NewDecoder(resp.Body).Decode(&obj)
 	if err != nil {
@@ -139,7 +218,7 @@ func GetWebplayback(adamId string, authtoken string, mutoken string, mvmode bool
 		if mvmode {
 			return obj.List[0].HlsPlaylistUrl, "", nil
 		}
-		// 遍历 Assets
+
 		for i := range obj.List[0].Assets {
 			if obj.List[0].Assets[i].Flavor == "28:ctrp256" {
 				kidBase64, fileurl, err := extractKidBase64(obj.List[0].Assets[i].URL, false)
@@ -167,7 +246,7 @@ type Songlist struct {
 }
 
 func extractKidBase64(b string, mvmode bool) (string, string, error) {
-	resp, err := http.Get(b)
+	resp, err := getHijackedClient().Get(b)
 	if err != nil {
 		return "", "", err
 	}
@@ -192,21 +271,16 @@ func extractKidBase64(b string, mvmode bool) (string, string, error) {
 			split := strings.Split(mediaPlaylist.Key.URI, ",")
 			kidbase64 = split[1]
 			lastSlashIndex := strings.LastIndex(b, "/")
-			// 截取最后一个斜杠之前的部分
 			urlBuilder.WriteString(b[:lastSlashIndex])
 			urlBuilder.WriteString("/")
 			urlBuilder.WriteString(mediaPlaylist.Map.URI)
-			//fileurl = b[:lastSlashIndex] + "/" + mediaPlaylist.Map.URI
-			//fmt.Println("Extracted URI:", mediaPlaylist.Map.URI)
 			if mvmode {
 				for _, segment := range mediaPlaylist.Segments {
 					if segment != nil {
-						//fmt.Println("Extracted URI:", segment.URI)
 						urlBuilder.WriteString(";")
 						urlBuilder.WriteString(b[:lastSlashIndex])
 						urlBuilder.WriteString("/")
 						urlBuilder.WriteString(segment.URI)
-						//fileurl = fileurl + ";" + b[:lastSlashIndex] + "/" + segment.URI
 					}
 				}
 			}
@@ -219,7 +293,7 @@ func extractKidBase64(b string, mvmode bool) (string, string, error) {
 	return kidbase64, urlBuilder.String(), nil
 }
 func extsong(b string) bytes.Buffer {
-	resp, err := http.Get(b)
+	resp, err := getHijackedClient().Get(b)
 	if err != nil {
 		fmt.Printf("下载文件失败: %v\n", err)
 	}
@@ -246,8 +320,9 @@ func extsong(b string) bytes.Buffer {
 	io.Copy(io.MultiWriter(&buffer, bar), resp.Body)
 	return buffer
 }
+
 func Run(adamId string, trackpath string, authtoken string, mutoken string, mvmode bool) (string, error) {
-	var keystr string //for mv key
+	var keystr string
 	var fileurl string
 	var kidBase64 string
 	var err error
@@ -266,7 +341,6 @@ func Run(adamId string, trackpath string, authtoken string, mutoken string, mvmo
 	ctx = context.WithValue(ctx, "pssh", kidBase64)
 	ctx = context.WithValue(ctx, "adamId", adamId)
 	pssh, err := getPSSH("", kidBase64)
-	//fmt.Println(pssh)
 	if err != nil {
 		fmt.Println(err)
 		return "", err
@@ -275,9 +349,11 @@ func Run(adamId string, trackpath string, authtoken string, mutoken string, mvmo
 		"authorization":            "Bearer " + authtoken,
 		"x-apple-music-user-token": mutoken,
 	}
+
 	client, _ := requests.NewClient(nil, requests.ClientOption{
 		Headers: headers,
 	})
+
 	key := key.Key{
 		ReqCli:        client,
 		BeforeRequest: BeforeRequest,
@@ -304,7 +380,6 @@ func Run(adamId string, trackpath string, authtoken string, mutoken string, mvmo
 	}
 	body := extsong(fileurl)
 	fmt.Print("Downloaded\n")
-	//bodyReader := bytes.NewReader(body)
 	var buffer bytes.Buffer
 
 	err = DecryptMP4(&body, keybt, &buffer)
@@ -314,7 +389,6 @@ func Run(adamId string, trackpath string, authtoken string, mutoken string, mvmo
 	} else {
 		fmt.Print("Decrypted\n")
 	}
-	// create output file
 	ofh, err := os.Create(trackpath)
 	if err != nil {
 		fmt.Printf("创建文件失败: %v\n", err)
@@ -330,14 +404,12 @@ func Run(adamId string, trackpath string, authtoken string, mutoken string, mvmo
 	return "", nil
 }
 
-// Segment 结构体用于在 Channel 中传递分段数据
 type Segment struct {
 	Index int
 	Data  []byte
 }
 
 func downloadSegment(url string, index int, wg *sync.WaitGroup, segmentsChan chan<- Segment, client *http.Client, limiter chan struct{}) {
-	// 函数退出时，从 limiter 中接收一个值，释放一个并发槽位
 	defer func() {
 		<-limiter
 		wg.Done()
@@ -367,53 +439,42 @@ func downloadSegment(url string, index int, wg *sync.WaitGroup, segmentsChan cha
 		return
 	}
 
-	// 将下载好的分段（包含序号和数据）发送到 Channel
 	segmentsChan <- Segment{Index: index, Data: data}
 }
 
-// fileWriter 从 Channel 接收分段并按顺序写入文件
 func fileWriter(wg *sync.WaitGroup, segmentsChan <-chan Segment, outputFile io.Writer, totalSegments int) {
 	defer wg.Done()
-
-	// 缓冲区，用于存放乱序到达的分段
-	// key 是分段序号，value 是分段数据
 	segmentBuffer := make(map[int][]byte)
-	nextIndex := 0 // 期望写入的下一个分段的序号
+	nextIndex := 0
 
 	for segment := range segmentsChan {
-		// 检查收到的分段是否是当前期望的
 		if segment.Index == nextIndex {
-			//fmt.Printf("写入分段 %d\n", segment.Index)
 			_, err := outputFile.Write(segment.Data)
 			if err != nil {
 				fmt.Printf("错误(分段 %d): 写入文件失败: %v\n", segment.Index, err)
 			}
 			nextIndex++
 
-			// 检查缓冲区中是否有下一个连续的分段
 			for {
 				data, ok := segmentBuffer[nextIndex]
 				if !ok {
-					break // 缓冲区里没有下一个，跳出循环，等待下一个分段到达
+					break
 				}
 
-				//fmt.Printf("从缓冲区写入分段 %d\n", nextIndex)
 				_, err := outputFile.Write(data)
 				if err != nil {
 					fmt.Printf("错误(分段 %d): 从缓冲区写入文件失败: %v\n", nextIndex, err)
 				}
-				// 从缓冲区删除已写入的分段，释放内存
+
 				delete(segmentBuffer, nextIndex)
 				nextIndex++
 			}
 		} else {
-			// 如果不是期望的分段，先存入缓冲区
-			//fmt.Printf("缓冲分段 %d (等待 %d)\n", segment.Index, nextIndex)
+
 			segmentBuffer[segment.Index] = segment.Data
 		}
 	}
 
-	// 确保所有分段都已写入
 	if nextIndex != totalSegments {
 		fmt.Printf("警告: 写入完成，但似乎有分段丢失。期望 %d 个, 实际写入 %d 个。\n", totalSegments, nextIndex)
 	}
@@ -422,7 +483,6 @@ func fileWriter(wg *sync.WaitGroup, segmentsChan <-chan Segment, outputFile io.W
 func ExtMvData(keyAndUrls string, savePath string) error {
 	segments := strings.Split(keyAndUrls, ";")
 	key := segments[0]
-	//fmt.Println(key)
 	urls := segments[1:]
 	tempFile, err := os.CreateTemp("", "enc_mv_data-*.mp4")
 	if err != nil {
@@ -434,40 +494,25 @@ func ExtMvData(keyAndUrls string, savePath string) error {
 
 	var downloadWg, writerWg sync.WaitGroup
 	segmentsChan := make(chan Segment, len(urls))
-	// --- 新增代码: 定义最大并发数 ---
-	const maxConcurrency = 10
-	// --- 新增代码: 创建带缓冲的 Channel 作为信号量 ---
+	const maxConcurrency = 15
 	limiter := make(chan struct{}, maxConcurrency)
-	client := &http.Client{}
-
-	// 初始化进度条
+	client := getHijackedClient()
 	bar := progressbar.DefaultBytes(-1, "Downloading...")
 	barWriter := io.MultiWriter(tempFile, bar)
-
-	// 启动写入 Goroutine
 	writerWg.Add(1)
 	go fileWriter(&writerWg, segmentsChan, barWriter, len(urls))
-
-	// 启动下载 Goroutines
 	for i, url := range urls {
-		//fmt.Printf("请求启动任务 %d...\n", i)
 		limiter <- struct{}{}
-		//fmt.Printf("...任务 %d 已启动\n", i)
-
 		downloadWg.Add(1)
 		go downloadSegment(url, i, &downloadWg, segmentsChan, client, limiter)
 	}
 
 	downloadWg.Wait()
 	close(segmentsChan)
-
 	writerWg.Wait()
-
 	if err := tempFile.Close(); err != nil {
-		
 		return err
 	}
-	
 
 	cmd1 := exec.Command("mp4decrypt", "--key", key, tempFile.Name(), filepath.Base(savePath))
 	cmd1.Dir = filepath.Dir(savePath)
@@ -481,9 +526,7 @@ func ExtMvData(keyAndUrls string, savePath string) error {
 	return nil
 }
 
-// DecryptMP4 decrypts a fragmented MP4 file with keys from widevice license. Supports CENC and CBCS schemes.
 func DecryptMP4(r io.Reader, key []byte, w io.Writer) error {
-	// Initialization
 	inMp4, err := mp4.DecodeFile(r)
 	if err != nil {
 		return fmt.Errorf("failed to decode file: %w", err)
@@ -491,7 +534,6 @@ func DecryptMP4(r io.Reader, key []byte, w io.Writer) error {
 	if !inMp4.IsFragmented() {
 		return errors.New("file is not fragmented")
 	}
-	// Handle init segment
 	if inMp4.Init == nil {
 		return errors.New("no init part of file")
 	}
@@ -502,13 +544,9 @@ func DecryptMP4(r io.Reader, key []byte, w io.Writer) error {
 	if err = inMp4.Init.Encode(w); err != nil {
 		return fmt.Errorf("failed to write init: %w", err)
 	}
-	// Decode segments
 	for _, seg := range inMp4.Segments {
 		if err = mp4.DecryptSegment(seg, decryptInfo, key); err != nil {
 			if err.Error() == "no senc box in traf" {
-				// No SENC box, skip decryption for this segment as samples can have
-				// unencrypted segments followed by encrypted segments. See:
-				// https://github.com/iyear/gowidevine/pull/26#issuecomment-2385960551
 				err = nil
 			} else {
 				return fmt.Errorf("failed to decrypt segment: %w", err)
