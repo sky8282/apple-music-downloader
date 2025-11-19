@@ -11,11 +11,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/spf13/pflag"
 	"main/internal/api"
 	"main/internal/core"
 	"main/internal/downloader"
 	"main/internal/parser"
-	"github.com/spf13/pflag"
 )
 
 var jsonOutput bool
@@ -113,8 +113,7 @@ func handleSingleMV(urlRaw string) {
 		).Replace(core.Config.ArtistFolderFormat)
 	}
 	sanitizedArtistFolder := core.ForbiddenNames.ReplaceAllString(artistFolder, "_")
-
-	_, err = downloader.MvDownloader(albumId, core.Config.AlacSaveFolder, sanitizedArtistFolder, "", storefront, nil, accountForMV, nil)
+	_, err = downloader.MvDownloader(albumId, core.Config.AlacSaveFolder, sanitizedArtistFolder, "", storefront, nil, accountForMV, nil, jsonOutput)
 
 	if err != nil {
 		core.SharedLock.Lock()
