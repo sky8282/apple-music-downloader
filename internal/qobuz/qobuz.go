@@ -240,10 +240,6 @@ func CleanHTML(text string) string {
 }
 
 func GetQobuzExtras(artistName, albumName string) (string, []PDFExtra, error) {
-	if core.Config.QobuzUsername == "" || core.Config.QobuzPassword == "" {
-		return "", nil, nil
-	}
-
 	primaryArtistName := artistName
 	delimiters := []string{",", "&"}
 	minIndex := -1
@@ -263,6 +259,9 @@ func GetQobuzExtras(artistName, albumName string) (string, []PDFExtra, error) {
 
 	authToken, err := getValidToken(core.Config.QobuzUsername, core.Config.QobuzPassword)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || strings.Contains(err.Error(), "credentials not configured") {
+			return "", nil, nil
+		}
 		return "", nil, fmt.Errorf("failed to get Qobuz token: %w", err)
 	}
 
