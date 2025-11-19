@@ -19,7 +19,6 @@ import (
 	"main/utils/structs"
 
 	"github.com/Eyevinn/mp4ff/mp4"
-	//"github.com/itouakirai/mp4ff/mp4"
 	"github.com/fatih/color"
 	"github.com/grafov/m3u8"
 )
@@ -30,6 +29,48 @@ type ProgressUpdate struct {
 	Percentage int
 	SpeedBPS   float64
 	Stage      string
+}
+
+var (
+	globalClient *http.Client
+	clientOnce   sync.Once
+)
+
+func getSharedClient(Config structs.ConfigSet) *http.Client {
+	clientOnce.Do(func() {
+		poolSize := Config.TxtDownloadThreads * Config.ChunkDownloadThreads
+		if poolSize < 20 {
+			poolSize = 20
+		}
+
+		t := &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			MaxIdleConnsPerHost:   poolSize,
+			MaxIdleConns:          poolSize * 2,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			ForceAttemptHTTP2:     true,
+		}
+
+		if Config.EnableCdnOverride && Config.CdnIp != "" {
+			dialer := &net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}
+			t.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				if strings.Contains(addr, "aod.itunes.apple.com") {
+					addr = Config.CdnIp + ":443"
+				}
+				return dialer.DialContext(ctx, network, addr)
+			}
+		}
+
+		globalClient = &http.Client{
+			Transport: t,
+		}
+	})
+	return globalClient
 }
 
 func getRemoteFileSize(fileUrl string, header http.Header, httpClient *http.Client) (int64, error) {
@@ -78,7 +119,7 @@ func downloadChunk(wg *sync.WaitGroup, errChan chan error, progressBytes chan in
 			return
 		}
 	}
-	
+
 	buffer := make([]byte, Config.NetworkReadBufferKB*1024)
 	var writtenBytes int64 = 0
 	for {
@@ -121,7 +162,7 @@ func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, n
 		for {
 			select {
 			case bytes, ok := <-progressBytes:
-				if !ok { // Channel closed
+				if !ok {
 					progressChan <- ProgressUpdate{Percentage: 100, SpeedBPS: 0, Stage: "download"}
 					return
 				}
@@ -166,38 +207,14 @@ func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, n
 func Run(adamId string, playlistUrl string, outfile string, account *structs.Account, Config structs.ConfigSet, progressChan chan ProgressUpdate) error {
 	header := make(http.Header)
 
-	var httpClient *http.Client
-	if Config.EnableCdnOverride && Config.CdnIp != "" {
-		dialer := &net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-					if strings.Contains(addr, "aod.itunes.apple.com") {
-						addr = Config.CdnIp + ":443"
-					}
-					return dialer.DialContext(ctx, network, addr)
-				},
-				ForceAttemptHTTP2:     true,
-				MaxIdleConns:          100,
-				IdleConnTimeout:       90 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-			},
-		}
-	} else {
-		httpClient = &http.Client{}
-	}
+	httpClient := getSharedClient(Config)
 
 	req, err := http.NewRequest("GET", playlistUrl, nil)
 	if err != nil {
 		return err
 	}
 	req.Header = header
-	do, err := (&http.Client{}).Do(req)
+	do, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -742,7 +759,7 @@ func RunOrchestrated(adamId string, playlistUrl string, targetStorefront string,
 	var lastError error
 
 	for _, acc := range orderedAccounts {
-		fmt.Printf("--------------------------------------------------\n")
+		fmt.Printf("--------------------------------------------------\n", acc.Name, acc.DecryptM3u8Port, yellow(strings.ToUpper(acc.Storefront)))
 		fmt.Printf("正在尝试服务: %s (端口: %s, 区域: %s)\n", acc.Name, acc.DecryptM3u8Port, yellow(strings.ToUpper(acc.Storefront)))
 		err := Run(adamId, playlistUrl, outfile, acc, config, nil)
 		if err == nil {
