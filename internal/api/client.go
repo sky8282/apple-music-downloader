@@ -17,9 +17,23 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 )
+
+var apiClient = &http.Client{
+	Transport: &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ForceAttemptHTTP2:     true,
+	},
+	Timeout: 30 * time.Second,
+}
 
 func GetUrlSong(songUrl string, account *structs.Account) (string, error) {
 	storefront, songId := parser.CheckUrlSong(songUrl)
@@ -51,7 +65,7 @@ func GetUrlArtistName(artistUrl string, account *structs.Account) (string, strin
 	query := url.Values{}
 	query.Set("l", core.Config.Language)
 	req.URL.RawQuery = query.Encode()
-	do, err := http.DefaultClient.Do(req)
+	do, err := apiClient.Do(req)
 	if err != nil {
 		return "", "", err
 	}
@@ -81,7 +95,7 @@ func CheckArtist(artistUrl string, account *structs.Account, relationship string
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", core.DeveloperToken))
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 		req.Header.Set("Origin", "https://music.apple.com")
-		do, err := http.DefaultClient.Do(req)
+		do, err := apiClient.Do(req)
 		if err != nil {
 			return nil, err
 		}
@@ -218,7 +232,7 @@ func GetMeta(albumId string, account *structs.Account, storefront string) (*stru
 	query.Set("extend", "editorialVideo")
 	query.Set("l", core.Config.Language)
 	req.URL.RawQuery = query.Encode()
-	do, err := http.DefaultClient.Do(req)
+	do, err := apiClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +258,7 @@ func GetMeta(albumId string, account *structs.Account, storefront string) (*stru
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", core.DeveloperToken))
 			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 			req.Header.Set("Origin", "https://music.apple.com")
-			do, err := http.DefaultClient.Do(req)
+			do, err := apiClient.Do(req)
 			if err != nil {
 				return nil, err
 			}
@@ -284,7 +298,7 @@ func GetInfoFromAdam(adamId string, account *structs.Account, storefront string)
 	request.Header.Set("User-Agent", "iTunes/12.11.3 (Windows; Microsoft Windows 10 x64 Professional Edition (Build 19041); x64) AppleWebKit/7611.1022.4001.1 (dt:2)")
 	request.Header.Set("Origin", "https://music.apple.com")
 
-	do, err := http.DefaultClient.Do(request)
+	do, err := apiClient.Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +333,7 @@ func GetMVInfoFromAdam(adamId string, account *structs.Account, storefront strin
 	request.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 	request.Header.Set("Origin", "https://music.apple.com")
 
-	do, err := http.DefaultClient.Do(request)
+	do, err := apiClient.Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +356,7 @@ func GetToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := apiClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -351,8 +365,6 @@ func GetToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	//regex := regexp.MustCompile(`/assets/index-legacy-[^/]+\.js`)
-	//修复正则匹配
 	regex := regexp.MustCompile(`/assets/index-legacy[-~][^/]+\.js`)
 	indexJsUri := regex.FindString(string(body))
 	if indexJsUri == "" {
@@ -362,7 +374,7 @@ func GetToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resp, err = http.DefaultClient.Do(req)
+	resp, err = apiClient.Do(req)
 	if err != nil {
 		return "", err
 	}
