@@ -36,18 +36,35 @@ Original script by Sorrow. Modified by me to include some fixes and improvements
 6. For dolby atmos: `go run main.go --atmos https://music.apple.com/us/album/1989-taylors-version-deluxe/1713845538`.
 7. For aac: `go run main.go --aac https://music.apple.com/us/album/1989-taylors-version-deluxe/1713845538`.
 8. For see quality: `go run main.go --debug https://music.apple.com/us/album/1989-taylors-version-deluxe/1713845538`.
-9. 先执行 go mod tidy   然后   go run main.go     直接回车启动txt模式
-10. 网页注入下载：
-    1. 安装node，检查node -v 和 npm -v
-    2. 根目录下执行  npm install   安装依赖
-    3. 根目录下执行  npm start     开始运行
-    4. 需要打包成桌面APP的话：
-        1. go build -ldflags="-s -w" -o downloader main.go 打包go为二进制文件，文件名 downloader
-        2. 放入二进制 MP4Box，  mp4decrypt，  ffmpeg 并给权限如：macos/linux  chmod +x 给权限
-        3. 打包
-            1. npm install -g electron  
-            2. npm run build  
-    5. 或自行修改代码
+## 🚀 一些修改
+### 更新 Go 依赖 ：
+```text
+go mod tidy
+```
+### UI相关：
+* 自行安装 node， 安装成功后，检查 node -v 和 npm -v
+* 安装 ui 程序需要的依赖
+```text
+npm install
+```
+* 开始运行
+```text
+npm start
+```
+### 打包成桌面APP：
+* 从自己电脑复制二进制 MP4Box，  mp4decrypt，  ffmpeg 到项目根目录下，并给权限如：macos/linux 系统使用  chmod +x 给权限
+* 打包 Go 程序
+```text
+go build -ldflags="-s -w" -o downloader main.go
+```
+* 安装 electron
+```text
+npm install -g electron
+```
+* 打包 UI 程序
+```text
+npm run build
+```
         
 ![2](https://github.com/user-attachments/assets/443344b5-c61d-4656-a3ae-6bb7a5062e14)
 
