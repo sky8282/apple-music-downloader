@@ -58,9 +58,51 @@ func getSharedClient(Config structs.ConfigSet) *http.Client {
 				Timeout:   30 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}
+
+			var audioCdnIp, mvCdnIp string
+			if strings.Contains(Config.CdnIp, ",") {
+				parts := strings.Split(Config.CdnIp, ",")
+				audioCdnIp = strings.TrimSpace(parts[0])
+				if len(parts) > 1 {
+					mvCdnIp = strings.TrimSpace(parts[1])
+				}
+			} else {
+				audioCdnIp = Config.CdnIp
+				mvCdnIp = Config.CdnIp
+			}
+
+			green := color.New(color.FgGreen).SprintFunc()
+			cyan := color.New(color.FgCyan).SprintFunc()
+			yellow := color.New(color.FgYellow).SprintFunc()
+
 			t.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				if strings.Contains(addr, "aod.itunes.apple.com") {
-					addr = Config.CdnIp + ":443"
+				host, port, err := net.SplitHostPort(addr)
+				if err != nil {
+					host = addr
+					port = "443"
+				}
+
+				targetIp := ""
+				isHijacked := false
+				hijackType := ""
+
+				if audioCdnIp != "" && strings.Contains(host, "aod.itunes.apple.com") {
+					targetIp = audioCdnIp
+					isHijacked = true
+					hijackType = "Audio"
+				}
+
+				if !isHijacked && mvCdnIp != "" {
+					if strings.Contains(host, "mvod.itunes.apple.com") || strings.Contains(host, "mvod") {
+						targetIp = mvCdnIp
+						isHijacked = true
+						hijackType = "Video"
+					}
+				}
+
+				if isHijacked {
+					fmt.Printf("%s [%s] %s -> %s\n", green("[CDN劫持]"), yellow(hijackType), host, cyan(targetIp))
+					addr = net.JoinHostPort(targetIp, port)
 				}
 				return dialer.DialContext(ctx, network, addr)
 			}
