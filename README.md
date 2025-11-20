@@ -71,9 +71,9 @@ npm run build
 
 ## wrapper-manager-v1版
 ### 实现多端口解密
-```text
+
 https://github.com/sky8282/wrapper-manager-v1
-```
+
 ![1](https://github.com/user-attachments/assets/df53ef8d-6e41-42f2-81d4-c76690cf16e7)
 
 
