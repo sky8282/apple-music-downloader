@@ -3,9 +3,7 @@ const queueButton = document.getElementById('queue-button');
 const queueCount = document.getElementById('queue-count');
 const minimizeButton = document.getElementById('minimize-button');
 const restoreButton = document.getElementById('restore-button');
-const backButton = document.getElementById('back-button');
-const fwdButton = document.getElementById('fwd-button');
-const refreshButton = document.getElementById('refresh-button');
+
 const btnServiceMusic = document.getElementById('btn-service-music');
 const btnServiceClassical = document.getElementById('btn-service-classical');
 const btnEditConfig = document.getElementById('btn-edit-config');
@@ -35,10 +33,6 @@ restoreButton.addEventListener('click', () => {
     taskBar.classList.remove('collapsed');
     window.desktopApp.restoreTaskbar(); 
 });
-
-backButton.addEventListener('click', () => window.desktopApp.navigateBack());
-fwdButton.addEventListener('click', () => window.desktopApp.navigateFwd());
-refreshButton.addEventListener('click', () => window.desktopApp.refreshPage());
 
 queueButton.addEventListener('click', () => {
     console.log("show-queue clicked");
