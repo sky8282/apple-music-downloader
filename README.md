@@ -69,7 +69,7 @@ npm run build
 ![2](https://github.com/user-attachments/assets/443344b5-c61d-4656-a3ae-6bb7a5062e14)
 
 
-## wrapper-manager-v1版，多账号多端口解密
+## wrapper - web 管理器，多账号多端口解密
 
 https://github.com/sky8282/wrapper-manager-v1
 
