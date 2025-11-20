@@ -69,6 +69,13 @@ npm run build
 ![2](https://github.com/user-attachments/assets/443344b5-c61d-4656-a3ae-6bb7a5062e14)
 
 
+## wrapper-manager-v1版
+### 实现单账号单区域多端口解密，多区域多端口解密
+```text
+https://github.com/sky8282/wrapper-manager-v1
+```
+![516023179-006f9376-b49f-4ef3-985e-0fb290760770](https://github.com/user-attachments/assets/3e016e60-b6aa-4dd3-b21e-336167e58a6e)
+
 
 [Chinese tutorial - see Method 3 for details](https://telegra.ph/Apple-Music-Alac高解析度无损音乐下载教程-04-02-2)
 
