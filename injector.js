@@ -470,5 +470,67 @@
     });
     pathObserver.observe(document.body, { childList: true, subtree: true });
 
+    function injectNavControls() {
+        if (document.getElementById('custom-nav-container')) return;
+
+        const searchWrapper = document.querySelector('[data-testid="search-input"]');
+
+        if (!searchWrapper) return; 
+
+        const navContainer = document.createElement('div');
+        navContainer.id = 'custom-nav-container';
+        navContainer.style.cssText = `
+            display: flex;
+            width: 100%;
+            box-sizing: border-box;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            padding: 0 0 8px 20px;
+            -webkit-app-region: no-drag;
+        `;
+
+        const btnStyle = `
+            background: transparent;
+            border: none;
+            color: #aaa;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s, background-color 0.2s;
+        `;
+
+        const iconBack = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`;
+        const iconFwd = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>`;
+        const iconRefresh = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>`;
+
+        function createNavBtn(html, title, onClick) {
+            const btn = document.createElement('button');
+            btn.innerHTML = html;
+            btn.title = title;
+            btn.style.cssText = btnStyle;
+            btn.onmouseenter = () => { btn.style.color = '#fff'; btn.style.backgroundColor = 'rgba(255,255,255,0.1)'; };
+            btn.onmouseleave = () => { btn.style.color = '#aaa'; btn.style.backgroundColor = 'transparent'; };
+            btn.onclick = (e) => {
+                e.preventDefault();
+                onClick();
+            };
+            return btn;
+        }
+
+        const btnBack = createNavBtn(iconBack, '后退', () => window.desktopApp.navigateBack());
+        const btnFwd = createNavBtn(iconFwd, '前进', () => window.desktopApp.navigateFwd());
+        const btnRefresh = createNavBtn(iconRefresh, '刷新', () => window.desktopApp.refreshPage());
+
+        navContainer.appendChild(btnBack);
+        navContainer.appendChild(btnFwd);
+        navContainer.appendChild(btnRefresh);
+        searchWrapper.parentElement.insertBefore(navContainer, searchWrapper);
+    }
+    setInterval(injectNavControls, 1000);
+
     console.log('Apple Music 助手已加载');
 })();
