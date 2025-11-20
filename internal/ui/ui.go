@@ -142,8 +142,8 @@ func (pui *ProgressUI) HandleProgress(trackIndex int, progressChan chan runv14.P
 		return
 	}
 
-	green := color.New(color.FgGreen).SprintFunc()
-	red := color.New(color.FgRed).SprintFunc()
+	red := color.New(color.FgRed).SprintFunc()       // 红色
+	yellow := color.New(color.FgYellow).SprintFunc() // 黄色
 
 	go func() {
 		var hasStartedDecrypting bool = false
@@ -158,7 +158,7 @@ func (pui *ProgressUI) HandleProgress(trackIndex int, progressChan chan runv14.P
 				}
 				bs.bar.SetCurrent(int64(p.Percentage))
 				bs.statusMu.Lock()
-				bs.statusMsg = red("解密中")
+				bs.statusMsg = red(fmt.Sprintf("%s 账号 解密中", accountName))
 				bs.isDecrypting = true
 				bs.speedStr = utils.FormatSpeed(p.SpeedBPS)
 				bs.statusMu.Unlock()
@@ -172,7 +172,8 @@ func (pui *ProgressUI) HandleProgress(trackIndex int, progressChan chan runv14.P
 					bs.statusMsg = "下载完成，等待解密中"
 					bs.speedStr = ""
 				} else {
-					bs.statusMsg = fmt.Sprintf("%s 账号下载中", green(accountName))
+					bs.statusMsg = yellow(fmt.Sprintf("%s 账号下载中", accountName))
+					
 					bs.speedStr = utils.FormatSpeed(p.SpeedBPS)
 				}
 				bs.statusMu.Unlock()
