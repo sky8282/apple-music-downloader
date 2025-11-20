@@ -70,7 +70,7 @@ npm run build
 
 
 ## wrapper-manager-v1版
-### 实现单账号单区域多端口解密，多区域多端口解密
+### 实现多端口解密
 ```text
 https://github.com/sky8282/wrapper-manager-v1
 ```
