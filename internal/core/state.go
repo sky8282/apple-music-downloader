@@ -115,6 +115,8 @@ func LoadConfig(configPath string) error {
 		fmt.Println(green("配置文件中未设置 'NetworkReadBufferKB'，自动设为默认值 4096KB (4MB)"))
 	}
 
+	fmt.Printf("全区域账号解密： %s\n", red(Config.GlobalDecryption))
+
 	useAutoDetect := true
 	if Config.MaxPathLength > 0 {
 		MaxPathLength = Config.MaxPathLength
@@ -144,10 +146,35 @@ func LoadConfig(configPath string) error {
 	}
 
 	if Config.EnableCdnOverride && Config.CdnIp != "" {
-		fmt.Printf("%s%s\n",
-			green("CDN 劫持已启用, 目标 IP: "),
-			red(Config.CdnIp),
-		)
+		var audioCdnIp, mvCdnIp string
+		if strings.Contains(Config.CdnIp, ",") {
+			parts := strings.Split(Config.CdnIp, ",")
+			audioCdnIp = strings.TrimSpace(parts[0])
+			if len(parts) > 1 {
+				mvCdnIp = strings.TrimSpace(parts[1])
+			}
+		} else {
+			audioCdnIp = Config.CdnIp
+			mvCdnIp = Config.CdnIp
+		}
+
+		isVideo := false
+		for _, arg := range os.Args {
+			if strings.Contains(arg, "/music-video/") {
+				isVideo = true
+				break
+			}
+		}
+
+		if isVideo {
+			if mvCdnIp != "" {
+				fmt.Printf("[CDN劫持] [Video] mvod.itunes.apple.com -> %s\n", red(mvCdnIp))
+			}
+		} else {
+			if audioCdnIp != "" {
+				fmt.Printf("[CDN劫持] [Audio] aod.itunes.apple.com -> %s\n", red(audioCdnIp))
+			}
+		}
 	}
 
 	if *Alac_max == 0 {
