@@ -643,6 +643,9 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 	if len(meta.Data[0].Relationships.Tracks.Data) > 0 {
 		firstTrackId := meta.Data[0].Relationships.Tracks.Data[0].ID
 		for _, acc := range core.Config.Accounts {
+			if !core.Config.GlobalDecryption && strings.ToLower(acc.Storefront) != strings.ToLower(storefront) {
+				continue
+			}
 			_, err := api.GetInfoFromAdam(firstTrackId, &acc, acc.Storefront)
 			if err == nil {
 				workingAccounts = append(workingAccounts, acc)
@@ -717,9 +720,9 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 		fmt.Printf("%s %s | %s | %s | %s\n",
 			green("音源:"),
 			green(albumQualityString),
-			green(fmt.Sprintf("%d 线程", numThreads)),
+			green(fmt.Sprintf("%d 个线程并行下载", numThreads)),
 			yellow(regionsStr),
-			green(fmt.Sprintf("%d 个账户并行下载", len(workingAccounts))),
+			green(fmt.Sprintf("%d 个端口并行解密", len(workingAccounts))),
 		)
 		fmt.Println(strings.Repeat("-", 50))
 	}
