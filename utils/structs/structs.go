@@ -62,6 +62,7 @@ type ConfigSet struct {
 	QobuzPassword           string    `yaml:"qobuz-password"`
 	EnableCdnOverride       bool      `yaml:"enable-cdn-override"`
 	CdnIp                   string    `yaml:"cdn-ip"`
+	GlobalDecryption        bool      `yaml:"global-decryption"`
 }
 
 type Counter struct {
@@ -550,6 +551,7 @@ type SongLyrics struct {
 		} `json:"attributes"`
 	} `json:"data"`
 }
+
 
 
 
