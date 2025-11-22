@@ -28,6 +28,7 @@ var (
 	Mv_max         *int
 	Mv_audio_type  *string
 	Aac_type       *string
+	TaggingThreads int
 	Config         structs.ConfigSet
 	Counter        structs.Counter
 	OkDict         = make(map[string][]int)
@@ -68,6 +69,7 @@ func InitFlags() {
 	pflag.BoolVar(&Dl_song, "song", false, "Enable single song download mode")
 	pflag.BoolVar(&Artist_select, "all-album", false, "Download all artist albums")
 	pflag.BoolVar(&Debug_mode, "debug", false, "Enable debug mode to show audio quality information")
+	pflag.IntVar(&TaggingThreads, "tagging-threads", 8, "Specify the max threads for tagging")
 	Alac_max = pflag.Int("alac-max", 0, "Specify the max quality for download alac")
 	Atmos_max = pflag.Int("atmos-max", 0, "Specify the max quality for download atmos")
 	Aac_type = pflag.String("aac-type", "aac", "Select AAC type, aac aac-binaural aac-downmix")
