@@ -19,7 +19,6 @@ import (
 	"main/utils/structs"
 
 	"github.com/Eyevinn/mp4ff/mp4"
-	"github.com/fatih/color"
 	"github.com/grafov/m3u8"
 )
 
@@ -71,10 +70,6 @@ func getSharedClient(Config structs.ConfigSet) *http.Client {
 				mvCdnIp = Config.CdnIp
 			}
 
-			green := color.New(color.FgGreen).SprintFunc()
-			cyan := color.New(color.FgCyan).SprintFunc()
-			yellow := color.New(color.FgYellow).SprintFunc()
-
 			t.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 				host, port, err := net.SplitHostPort(addr)
 				if err != nil {
@@ -84,24 +79,20 @@ func getSharedClient(Config structs.ConfigSet) *http.Client {
 
 				targetIp := ""
 				isHijacked := false
-				hijackType := ""
 
 				if audioCdnIp != "" && strings.Contains(host, "aod.itunes.apple.com") {
 					targetIp = audioCdnIp
 					isHijacked = true
-					hijackType = "Audio"
 				}
 
 				if !isHijacked && mvCdnIp != "" {
 					if strings.Contains(host, "mvod.itunes.apple.com") || strings.Contains(host, "mvod") {
 						targetIp = mvCdnIp
 						isHijacked = true
-						hijackType = "Video"
 					}
 				}
 
 				if isHijacked {
-					fmt.Printf("%s [%s] %s -> %s\n", green("[CDN劫持]"), yellow(hijackType), host, cyan(targetIp))
 					addr = net.JoinHostPort(targetIp, port)
 				}
 				return dialer.DialContext(ctx, network, addr)
@@ -772,10 +763,8 @@ func DecryptFragment(frag *mp4.Fragment, tracks map[uint32]mp4.DecryptTrackInfo,
 }
 
 func RunOrchestrated(adamId string, playlistUrl string, targetStorefront string, outfile string, allAccounts []structs.Account, config structs.ConfigSet) error {
-	yellow := color.New(color.FgYellow).SprintFunc()
-
 	if targetStorefront != "" {
-		fmt.Printf("从链接中识别到区域 (Storefront): %s\n", yellow(strings.ToUpper(targetStorefront)))
+		fmt.Printf("从链接中识别到区域 (Storefront): %s\n", strings.ToUpper(targetStorefront))
 	} else {
 		fmt.Println("警告: 无法从URL中自动识别区域，将按配置文件顺序尝试所有可用服务。")
 	}
@@ -801,8 +790,8 @@ func RunOrchestrated(adamId string, playlistUrl string, targetStorefront string,
 	var lastError error
 
 	for _, acc := range orderedAccounts {
-		fmt.Printf("--------------------------------------------------\n", acc.Name, acc.DecryptM3u8Port, yellow(strings.ToUpper(acc.Storefront)))
-		fmt.Printf("正在尝试服务: %s (端口: %s, 区域: %s)\n", acc.Name, acc.DecryptM3u8Port, yellow(strings.ToUpper(acc.Storefront)))
+		fmt.Printf("--------------------------------------------------\n")
+		fmt.Printf("正在尝试服务: %s (端口: %s, 区域: %s)\n", acc.Name, acc.DecryptM3u8Port, strings.ToUpper(acc.Storefront))
 		err := Run(adamId, playlistUrl, outfile, acc, config, nil)
 		if err == nil {
 			fmt.Printf("服务 %s 操作成功！任务完成。\n", acc.Name)
