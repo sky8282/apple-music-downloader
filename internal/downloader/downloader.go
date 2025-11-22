@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatih/color"
@@ -734,13 +735,27 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 	}
 
 	semaphore := make(chan struct{}, numThreads)
+	var dispatchCounter uint64
 
-	for i, trackNum := range selected {
+	for _, trackNum := range selected {
 		wg.Add(1)
-		go func(trackIndexInMeta int, statusIndex int) {
+		go func(trackIndexInMeta int) {
 			semaphore <- struct{}{}
+
+			currentDispatch := atomic.AddUint64(&dispatchCounter, 1) - 1
+			statusIndex := int(currentDispatch)
+
+			semaphoreReleased := false
+
+			releaseSem := func() {
+				if !semaphoreReleased {
+					<-semaphore
+					semaphoreReleased = true
+				}
+			}
+
 			defer func() {
-				<-semaphore
+				releaseSem()
 				if r := recover(); r != nil {
 					fmt.Printf("\nFATAL: Goroutine for track %d panicked: %v\n", trackIndexInMeta, r)
 				}
@@ -797,6 +812,11 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 			const PostDownloadMaxRetries = 3
 
 			for attempt := 1; attempt <= PostDownloadMaxRetries; attempt++ {
+				if semaphoreReleased {
+					semaphore <- struct{}{}
+					semaphoreReleased = false
+				}
+
 				if attempt > 1 {
 					if jsonOutput {
 						printJSON(albumId, trackIndexInMeta, trackData.Attributes.Name, meta.Data[0].Attributes.Name, "progress", 0, "", fmt.Sprintf("第 %d/%d 次重试...", attempt, PostDownloadMaxRetries))
@@ -843,6 +863,8 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 					core.SharedLock.Unlock()
 					return
 				}
+
+				releaseSem()
 
 				var postDownloadError error
 				wasFixed := false
@@ -918,7 +940,7 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 				core.SharedLock.Unlock()
 				return
 			}
-		}(trackNum, i)
+		}(trackNum)
 	}
 
 	wg.Wait()
