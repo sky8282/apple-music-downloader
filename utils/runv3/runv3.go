@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/Eyevinn/mp4ff/mp4"
-	"github.com/fatih/color"
 	"github.com/grafov/m3u8"
 	"github.com/schollz/progressbar/v3"
 	"github.com/sky8282/requests"
@@ -77,10 +76,6 @@ func getHijackedClient() *http.Client {
 				mvCdnIp = core.Config.CdnIp
 			}
 
-			green := color.New(color.FgGreen).SprintFunc()
-			cyan := color.New(color.FgCyan).SprintFunc()
-			yellow := color.New(color.FgYellow).SprintFunc()
-
 			t.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 				host, port, err := net.SplitHostPort(addr)
 				if err != nil {
@@ -90,24 +85,20 @@ func getHijackedClient() *http.Client {
 
 				targetIp := ""
 				isHijacked := false
-				hijackType := ""
 
 				if audioCdnIp != "" && strings.Contains(host, "aod.itunes.apple.com") {
 					targetIp = audioCdnIp
 					isHijacked = true
-					hijackType = "Audio"
 				}
 
 				if !isHijacked && mvCdnIp != "" {
 					if strings.Contains(host, "mvod.itunes.apple.com") || strings.Contains(host, "mvod") {
 						targetIp = mvCdnIp
 						isHijacked = true
-						hijackType = "Video"
 					}
 				}
 
 				if isHijacked {
-					fmt.Printf("%s [%s] %s -> %s\n", green("[CDN劫持]"), yellow(hijackType), host, cyan(targetIp))
 					addr = net.JoinHostPort(targetIp, port)
 				}
 
