@@ -115,14 +115,13 @@ func LoadConfig(configPath string) error {
 		fmt.Println(green("配置文件中未设置 'NetworkReadBufferKB'，自动设为默认值 4096KB (4MB)"))
 	}
 
-	fmt.Printf("全区域账号解密： %s\n", red(Config.GlobalDecryption))
-
+	fmt.Printf("%s -> %s\n", green("全区域账号解密"), red(Config.GlobalDecryption))
 	useAutoDetect := true
 	if Config.MaxPathLength > 0 {
 		MaxPathLength = Config.MaxPathLength
 		useAutoDetect = false
-		fmt.Printf("%s%s\n",
-			green("从配置文件强制使用最大路径长度限制: "),
+		fmt.Printf("%s -> %s\n",
+			green("从配置文件强制使用最大路径长度限制"),
 			red(fmt.Sprintf("%d", MaxPathLength)),
 		)
 	}
@@ -158,22 +157,44 @@ func LoadConfig(configPath string) error {
 			mvCdnIp = Config.CdnIp
 		}
 
-		isVideo := false
+		showAudio := true
+		showVideo := true
+		foundDirectUrl := false
+		isMvUrl := false
+
 		for _, arg := range os.Args {
-			if strings.Contains(arg, "/music-video/") {
-				isVideo = true
+			if strings.HasPrefix(arg, "-") {
+				continue
+			}
+			if strings.HasSuffix(strings.ToLower(arg), ".txt") {
+				showAudio = true
+				showVideo = true
+				foundDirectUrl = false
 				break
+			}
+			if strings.Contains(arg, "music.apple.com") {
+				foundDirectUrl = true
+				if strings.Contains(arg, "/music-video/") {
+					isMvUrl = true
+				}
 			}
 		}
 
-		if isVideo {
-			if mvCdnIp != "" {
-				fmt.Printf("[CDN劫持] [Video] mvod.itunes.apple.com -> %s\n", red(mvCdnIp))
+		if foundDirectUrl {
+			if isMvUrl {
+				showAudio = false
+				showVideo = true
+			} else {
+				showAudio = true
+				showVideo = false
 			}
-		} else {
-			if audioCdnIp != "" {
-				fmt.Printf("[CDN劫持] [Audio] aod.itunes.apple.com -> %s\n", red(audioCdnIp))
-			}
+		}
+
+		if showAudio && audioCdnIp != "" {
+			fmt.Printf("%s -> %s\n", green("[CDN劫持] [Audio] aod.itunes.apple.com"), red(audioCdnIp))
+		}
+		if showVideo && mvCdnIp != "" {
+			fmt.Printf("%s -> %s\n", green("[CDN劫持] [Video] mvod.itunes.apple.com"), red(mvCdnIp))
 		}
 	}
 
