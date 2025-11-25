@@ -73,9 +73,7 @@ npm run build
 
 https://github.com/sky8282/wrapper-manager-v1
 
-
-![1](https://github.com/user-attachments/assets/df53ef8d-6e41-42f2-81d4-c76690cf16e7)
-
+![2](https://github.com/user-attachments/assets/5bb9bdc9-9e7a-49f3-9ee6-d4cf67dac2fd)
 
 [Chinese tutorial - see Method 3 for details](https://telegra.ph/Apple-Music-Alac高解析度无损音乐下载教程-04-02-2)
 
