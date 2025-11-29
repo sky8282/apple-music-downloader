@@ -15,9 +15,9 @@ type SongLyrics struct {
 		Id         string `json:"id"`
 		Type       string `json:"type"`
 		Attributes struct {
-			Ttml       string `json:"ttml"`
-			TtmlLocalizations       string `json:"ttmlLocalizations"`
-			PlayParams struct {
+			Ttml              string `json:"ttml"`
+			TtmlLocalizations string `json:"ttmlLocalizations"`
+			PlayParams        struct {
 				Id          string `json:"id"`
 				Kind        string `json:"kind"`
 				CatalogId   string `json:"catalogId"`
@@ -27,12 +27,17 @@ type SongLyrics struct {
 	} `json:"data"`
 }
 
-func Get(storefront, songId, lrcType, language, lrcFormat, token, mediaUserToken string) (string, error) {
+func Get(storefront, songId, lrcType, language, lrcFormat, token, mediaUserToken string, enableTranslation bool, transLanguage string) (string, error) {
 	if len(mediaUserToken) < 50 {
 		return "", errors.New("MediaUserToken not set")
 	}
 
-	ttml, err := getSongLyrics(songId, storefront, token, mediaUserToken, lrcType, language)
+	reqLang := language
+	if enableTranslation && transLanguage != "" {
+		reqLang = transLanguage
+	}
+
+	ttml, err := getSongLyrics(songId, storefront, token, mediaUserToken, lrcType, reqLang)
 	if err != nil {
 		return "", err
 	}
@@ -41,7 +46,7 @@ func Get(storefront, songId, lrcType, language, lrcFormat, token, mediaUserToken
 		return ttml, nil
 	}
 
-	lrc, err := TtmlToLrc(ttml)
+	lrc, err := TtmlToLrc(ttml, enableTranslation)
 	if err != nil {
 		return "", err
 	}
@@ -68,6 +73,9 @@ func getSongLyrics(songId string, storefront string, token string, userToken str
 	obj := new(SongLyrics)
 	_ = json.NewDecoder(do.Body).Decode(&obj)
 	if obj.Data != nil {
+		if len(obj.Data[0].Attributes.TtmlLocalizations) > 0 {
+			return obj.Data[0].Attributes.TtmlLocalizations, nil
+		}
 		if len(obj.Data[0].Attributes.Ttml) > 0 {
 			return obj.Data[0].Attributes.Ttml, nil
 		}
@@ -77,30 +85,29 @@ func getSongLyrics(songId string, storefront string, token string, userToken str
 	}
 }
 
-// Use for detect if lyrics have CJK, will be replaced by transliteration if exist.
 func containsCJK(s string) bool {
 	for _, r := range s {
-		if (r >= 0x1100 && r <= 0x11FF)    || // Hangul Jamo
-			(r >= 0x2E80 && r <= 0x2EFF)   || // CJK Radicals Supplement
-			(r >= 0x2F00 && r <= 0x2FDF)   || // Kangxi Radicals
-			(r >= 0x2FF0 && r <= 0x2FFF)   || // Ideographic Description Characters
-			(r >= 0x3000 && r <= 0x303F)   || // CJK Symbols and Punctuation
-			(r >= 0x3040 && r <= 0x309F)   || // Hiragana
-			(r >= 0x30A0 && r <= 0x30FF)   || // Katakana
-			(r >= 0x3130 && r <= 0x318F)   || // Hangul Compatibility Jamo
-			(r >= 0x31C0 && r <= 0x31EF)   || // CJK Strokes
-			(r >= 0x31F0 && r <= 0x31FF)   || // Katakana Phonetic Extensions
-			(r >= 0x3200 && r <= 0x32FF)   || // Enclosed CJK Letters and Months
-			(r >= 0x3300 && r <= 0x33FF)   || // CJK Compatibility
-			(r >= 0x3400 && r <= 0x4DBF)   || // CJK Unified Ideographs Extension A
-			(r >= 0x4E00 && r <= 0x9FFF)   || // CJK Unified Ideographs
-			(r >= 0xA960 && r <= 0xA97F)   || // Hangul Jamo Extended-A
-			(r >= 0xAC00 && r <= 0xD7AF)   || // Hangul Syllables
-			(r >= 0xD7B0 && r <= 0xD7FF)   || // Hangul Jamo Extended-B
-			(r >= 0xF900 && r <= 0xFAFF)   || // CJK Compatibility Ideographs
-			(r >= 0xFE30 && r <= 0xFE4F)   || // CJK Compatibility Forms
-			(r >= 0xFF65 && r <= 0xFF9F)   || // Halfwidth Katakana
-			(r >= 0xFFA0 && r <= 0xFFDC)   || // Halfwidth Jamo
+		if (r >= 0x1100 && r <= 0x11FF) || // Hangul Jamo
+			(r >= 0x2E80 && r <= 0x2EFF) || // CJK Radicals Supplement
+			(r >= 0x2F00 && r <= 0x2FDF) || // Kangxi Radicals
+			(r >= 0x2FF0 && r <= 0x2FFF) || // Ideographic Description Characters
+			(r >= 0x3000 && r <= 0x303F) || // CJK Symbols and Punctuation
+			(r >= 0x3040 && r <= 0x309F) || // Hiragana
+			(r >= 0x30A0 && r <= 0x30FF) || // Katakana
+			(r >= 0x3130 && r <= 0x318F) || // Hangul Compatibility Jamo
+			(r >= 0x31C0 && r <= 0x31EF) || // CJK Strokes
+			(r >= 0x31F0 && r <= 0x31FF) || // Katakana Phonetic Extensions
+			(r >= 0x3200 && r <= 0x32FF) || // Enclosed CJK Letters and Months
+			(r >= 0x3300 && r <= 0x33FF) || // CJK Compatibility
+			(r >= 0x3400 && r <= 0x4DBF) || // CJK Unified Ideographs Extension A
+			(r >= 0x4E00 && r <= 0x9FFF) || // CJK Unified Ideographs
+			(r >= 0xA960 && r <= 0xA97F) || // Hangul Jamo Extended-A
+			(r >= 0xAC00 && r <= 0xD7AF) || // Hangul Syllables
+			(r >= 0xD7B0 && r <= 0xD7FF) || // Hangul Jamo Extended-B
+			(r >= 0xF900 && r <= 0xFAFF) || // CJK Compatibility Ideographs
+			(r >= 0xFE30 && r <= 0xFE4F) || // CJK Compatibility Forms
+			(r >= 0xFF65 && r <= 0xFF9F) || // Halfwidth Katakana
+			(r >= 0xFFA0 && r <= 0xFFDC) || // Halfwidth Jamo
 			(r >= 0x1AFF0 && r <= 0x1AFFF) || // Kana Extended-B
 			(r >= 0x1B000 && r <= 0x1B0FF) || // Kana Supplement
 			(r >= 0x1B100 && r <= 0x1B12F) || // Kana Extended-A
@@ -114,14 +121,14 @@ func containsCJK(s string) bool {
 			(r >= 0x2EBF0 && r <= 0x2EE5F) || // CJK Unified Ideographs Extension I
 			(r >= 0x2F800 && r <= 0x2FA1F) || // CJK Compatibility Ideographs Supplement
 			(r >= 0x30000 && r <= 0x3134F) || // CJK Unified Ideographs Extension G
-			(r >= 0x31350 && r <= 0x323AF) {  // CJK Unified Ideographs Extension H
+			(r >= 0x31350 && r <= 0x323AF) { // CJK Unified Ideographs Extension H
 			return true
 		}
 	}
 	return false
 }
 
-func TtmlToLrc(ttml string) (string, error) {
+func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 	parsedTTML := etree.NewDocument()
 	err := parsedTTML.ReadFromString(ttml)
 	if err != nil {
@@ -132,7 +139,7 @@ func TtmlToLrc(ttml string) (string, error) {
 	timingAttr := parsedTTML.FindElement("tt").SelectAttr("itunes:timing")
 	if timingAttr != nil {
 		if timingAttr.Value == "Word" {
-			lrc, err := conventSyllableTTMLToLRC(ttml)
+			lrc, err := conventSyllableTTMLToLRC(ttml, enableTranslation)
 			return lrc, err
 		}
 		if timingAttr.Value == "None" {
@@ -174,7 +181,6 @@ func TtmlToLrc(ttml string) (string, error) {
 			m += h * 60
 			ms = ms / 10
 			var text, transText, translitText string
-			//GET trans and translit
 			if len(parsedTTML.FindElement("tt").FindElements("head")) > 0 {
 				if len(parsedTTML.FindElement("tt").FindElement("head").FindElements("metadata")) > 0 {
 					Metadata := parsedTTML.FindElement("tt").FindElement("head").FindElement("metadata")
@@ -201,23 +207,25 @@ func TtmlToLrc(ttml string) (string, error) {
 								}
 							}
 						}
-						if len(iTunesMetadata.FindElements("translations")) > 0 {
-							if len(iTunesMetadata.FindElement("translations").FindElements("translation")) > 0 {
-								xpath := fmt.Sprintf("//text[@for='%s']", lyric.SelectAttr("itunes:key").Value)
-								trans := iTunesMetadata.FindElement("translations").FindElement("translation").FindElement(xpath)
-								if trans != nil {
-									if trans.SelectAttr("text") != nil {
-										transText = trans.SelectAttr("text").Value
-									} else {
-										var transTmp []string
-										for _, span := range trans.Child {
-											if c, ok := span.(*etree.CharData); ok {
-												transTmp = append(transTmp, c.Data)
-											} else if e, ok := span.(*etree.Element); ok {
-												transTmp = append(transTmp, e.Text())
+						if enableTranslation {
+							if len(iTunesMetadata.FindElements("translations")) > 0 {
+								if len(iTunesMetadata.FindElement("translations").FindElements("translation")) > 0 {
+									xpath := fmt.Sprintf("text[@for='%s']", lyric.SelectAttr("itunes:key").Value)
+									trans := iTunesMetadata.FindElement("translations").FindElement("translation").FindElement(xpath)
+									if trans != nil {
+										if trans.SelectAttr("text") != nil {
+											transText = trans.SelectAttr("text").Value
+										} else {
+											var transTmp []string
+											for _, span := range trans.Child {
+												if c, ok := span.(*etree.CharData); ok {
+													transTmp = append(transTmp, c.Data)
+												} else if e, ok := span.(*etree.Element); ok {
+													transTmp = append(transTmp, e.Text())
+												}
 											}
+											transText = strings.Join(transTmp, "")
 										}
-										transText = strings.Join(transTmp, "")
 									}
 								}
 							}
@@ -238,20 +246,20 @@ func TtmlToLrc(ttml string) (string, error) {
 			} else {
 				text = lyric.SelectAttr("text").Value
 			}
-			if len(transText) > 0 {
-				lrcLines = append(lrcLines, fmt.Sprintf("[%02d:%02d.%02d]%s", m, s, ms, transText))
-			}
 			if len(translitText) > 0 && containsCJK(text) {
 				lrcLines = append(lrcLines, fmt.Sprintf("[%02d:%02d.%02d]%s", m, s, ms, translitText))
 			} else {
 				lrcLines = append(lrcLines, fmt.Sprintf("[%02d:%02d.%02d]%s", m, s, ms, text))
+			}
+			if enableTranslation && len(transText) > 0 {
+				lrcLines = append(lrcLines, fmt.Sprintf("[%02d:%02d.%02d]%s", m, s, ms, transText))
 			}
 		}
 	}
 	return strings.Join(lrcLines, "\n"), nil
 }
 
-func conventSyllableTTMLToLRC(ttml string) (string, error) {
+func conventSyllableTTMLToLRC(ttml string, enableTranslation bool) (string, error) {
 	parsedTTML := etree.NewDocument()
 	err := parsedTTML.ReadFromString(ttml)
 	if err != nil {
@@ -276,7 +284,7 @@ func conventSyllableTTMLToLRC(ttml string) (string, error) {
 		m += h * 60
 		ms = ms / 10
 		if newLine == 0 {
-			return fmt.Sprintf("[%02d:%02d.%02d]<%02d:%02d.%02d>", m, s, ms, m, s, ms), nil
+			return fmt.Sprintf("[%02d:%02d.%02d]", m, s, ms), nil
 		} else if newLine == -1 {
 			return fmt.Sprintf("[%02d:%02d.%02d]", m, s, ms), nil
 		} else {
@@ -285,14 +293,16 @@ func conventSyllableTTMLToLRC(ttml string) (string, error) {
 	}
 	divs := parsedTTML.FindElement("tt").FindElement("body").FindElements("div")
 	for _, div := range divs {
-		for _, item := range div.ChildElements() {     //LINES
-			var lrcSyllables []string
+		for _, item := range div.ChildElements() {
+			var lineTextBuilder strings.Builder
+			var lineStartTime string
 			var i int = 0
-			var endTime, translitLine, transLine string
-			for _, lyrics := range item.Child {    //WORDS
-				if _, ok := lyrics.(*etree.CharData); ok {   //是否为span之间的空格
+			var translitLine, transLine string
+
+			for _, lyrics := range item.Child {
+				if _, ok := lyrics.(*etree.CharData); ok {
 					if i > 0 {
-						lrcSyllables = append(lrcSyllables, " ")
+						lineTextBuilder.WriteString(" ")
 						continue
 					}
 					continue
@@ -301,15 +311,14 @@ func conventSyllableTTMLToLRC(ttml string) (string, error) {
 				if lyric.SelectAttr("begin") == nil {
 					continue
 				}
-				beginTime, err := parseTime(lyric.SelectAttr("begin").Value, i)
-				if err != nil {
+
+				if i == 0 {
+					lineStartTime, err = parseTime(lyric.SelectAttr("begin").Value, -1)
+					if err != nil {
 						return "", err
+					}
 				}
 
-				endTime, err = parseTime(lyric.SelectAttr("end").Value, 1)
-				if err != nil {
-					return "", err
-				}
 				var text string
 				if lyric.SelectAttr("text") == nil {
 					var textTmp []string
@@ -324,68 +333,59 @@ func conventSyllableTTMLToLRC(ttml string) (string, error) {
 				} else {
 					text = lyric.SelectAttr("text").Value
 				}
-				lrcSyllables = append(lrcSyllables, fmt.Sprintf("%s%s", beginTime, text))
+
+				if i > 0 {
+					lineTextBuilder.WriteString(" ")
+				}
+				lineTextBuilder.WriteString(text)
+
 				if i == 0 {
-					transBeginTime, _ := parseTime(lyric.SelectAttr("begin").Value, -1)
-					sharedTimestamp := ""
+					transBeginTime := lineStartTime
 					if len(parsedTTML.FindElement("tt").FindElements("head")) > 0 {
 						if len(parsedTTML.FindElement("tt").FindElement("head").FindElements("metadata")) > 0 {
 							Metadata := parsedTTML.FindElement("tt").FindElement("head").FindElement("metadata")
 							if len(Metadata.FindElements("iTunesMetadata")) > 0 {
 								iTunesMetadata := Metadata.FindElement("iTunesMetadata")
+
 								if len(iTunesMetadata.FindElements("transliterations")) > 0 {
 									if len(iTunesMetadata.FindElement("transliterations").FindElements("transliteration")) > 0 {
 										xpath := fmt.Sprintf("text[@for='%s']", item.SelectAttr("itunes:key").Value)
 										trans := iTunesMetadata.FindElement("transliterations").FindElement("transliteration").FindElement(xpath)
-										// Get text content
 										var transTxtParts []string
-										var transStartTime string
-										for i, span := range trans.ChildElements() {
-											if span.Tag == "span" {
-												spanBegin := span.SelectAttrValue("begin", "")
-												spanText := span.Text()
-												if spanBegin == "" {
-													continue
+										if trans != nil {
+											for _, span := range trans.ChildElements() {
+												if span.Tag == "span" {
+													spanText := span.Text()
+													transTxtParts = append(transTxtParts, spanText)
 												}
-												// Get timestamp
-												timestamp, err := parseTime(spanBegin, 2)
-												if err != nil {
-													return "", err
-												}
-												if i == 0 {
-													// For [mm:ss.xx] prefix
-													transStartTime, _ = parseTime(spanBegin, -1)
-													sharedTimestamp = transStartTime
-												}
-												transTxtParts = append(transTxtParts, fmt.Sprintf("%s%s", timestamp, spanText))
 											}
 										}
-										translitLine = fmt.Sprintf("%s%s", transStartTime, strings.Join(transTxtParts, " "))
+										if len(transTxtParts) > 0 {
+											translitLine = fmt.Sprintf("%s%s", transBeginTime, strings.Join(transTxtParts, " "))
+										}
 									}
 								}
-								if len(iTunesMetadata.FindElements("translations")) > 0 {
-									if len(iTunesMetadata.FindElement("translations").FindElements("translation")) > 0 {
-										xpath := fmt.Sprintf("//text[@for='%s']", item.SelectAttr("itunes:key").Value)
-										trans := iTunesMetadata.FindElement("translations").FindElement("translation").FindElement(xpath)
-										var transTxt string
-										if trans.SelectAttr("text") == nil {
-											var textTmp []string
-											for _, span := range trans.Child {
-												if _, ok := span.(*etree.CharData); ok {
-													textTmp = append(textTmp, span.(*etree.CharData).Data)
-												} /*else {
-													textTmp = append(textTmp, span.(*etree.Element).Text())
-												}*/
+
+								if enableTranslation {
+									if len(iTunesMetadata.FindElements("translations")) > 0 {
+										if len(iTunesMetadata.FindElement("translations").FindElements("translation")) > 0 {
+											xpath := fmt.Sprintf("text[@for='%s']", item.SelectAttr("itunes:key").Value)
+											trans := iTunesMetadata.FindElement("translations").FindElement("translation").FindElement(xpath)
+											if trans != nil {
+												var transTxt string
+												if trans.SelectAttr("text") == nil {
+													var textTmp []string
+													for _, span := range trans.Child {
+														if _, ok := span.(*etree.CharData); ok {
+															textTmp = append(textTmp, span.(*etree.CharData).Data)
+														}
+													}
+													transTxt = strings.Join(textTmp, "")
+												} else {
+													transTxt = trans.SelectAttr("text").Value
+												}
+												transLine = lineStartTime + transTxt
 											}
-											transTxt = strings.Join(textTmp, "")
-										} else {
-											transTxt = trans.SelectAttr("text").Value
-										}
-										//fmt.Println(transTxt)
-										if sharedTimestamp != "" {
-											transLine = sharedTimestamp + transTxt
-										} else {
-											transLine = transBeginTime + transTxt
 										}
 									}
 								}
@@ -395,17 +395,17 @@ func conventSyllableTTMLToLRC(ttml string) (string, error) {
 				}
 				i += 1
 			}
-			//endTime, err := parseTime(item.SelectAttr("end").Value)
-			//if err != nil {
-			//	return "", err
-			//}
-			if len(transLine) > 0 {
-				lrcLines = append(lrcLines, transLine)
-			}
-			if len(translitLine) > 0 && containsCJK(strings.Join(lrcSyllables, "")) {
+
+			finalLineText := lineTextBuilder.String()
+
+			if len(translitLine) > 0 && containsCJK(finalLineText) {
 				lrcLines = append(lrcLines, translitLine)
 			} else {
-				lrcLines = append(lrcLines, strings.Join(lrcSyllables, "")+endTime)
+				lrcLines = append(lrcLines, lineStartTime+finalLineText)
+			}
+
+			if enableTranslation && len(transLine) > 0 {
+				lrcLines = append(lrcLines, transLine)
 			}
 		}
 	}
