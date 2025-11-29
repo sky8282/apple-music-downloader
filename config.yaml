@@ -4,33 +4,19 @@
 # 下载单曲时，程序将根据链接的区域 (如 /cn/, /us/) 自动匹配拥有相同 "storefront" 值的账号
 # ----------------------------------------------------------------
 accounts:
-  - name: "CN-1"           # 账号名称，方便识别
+  - name: "CN"           # 账号名称，方便识别
     storefront: "cn"     # 账号所属区域 (必须小写, 如 cn, us, jp, hk)
     media-user-token: "your-media-user-token"
     # authorization-token: "your-cn-auth-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
-    decrypt-m3u8-port: "192.168.64.3:10020" # 此账号对应的解密服务端口
-    get-m3u8-port: "192.168.64.3:10021"     # 此账号对应的M3U8获取服务端口
+    decrypt-m3u8-port: "192.168.1.132:8888" # 此账号对应的解密服务端口
+    get-m3u8-port: "192.168.1.132:8889"     # 此账号对应的M3U8获取服务端口
 # ----------------------------------------------------------------
-  - name: "CN-2"           # 账号名称，方便识别
-    storefront: "cn"     # 账号所属区域 (必须小写, 如 cn, us, jp, hk)
-    media-user-token: "your-media-user-token"
-    # authorization-token: "your-cn-auth-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
-    decrypt-m3u8-port: "192.168.64.3:20020" # 此账号对应的解密服务端口
-    get-m3u8-port: "192.168.64.3:20021"     # 此账号对应的M3U8获取服务端口
-# ----------------------------------------------------------------
-  - name: "JP-1"           # 账号名称，方便识别
+  - name: "JP"           # 账号名称，方便识别
     storefront: "jp"     # 账号所属区域 (必须小写, 如 cn, us, jp, hk)
     media-user-token: "your-media-user-token"
     # authorization-token: "your-cn-auth-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
-    decrypt-m3u8-port: "192.168.64.3:30020" # 此账号对应的解密服务端口
-    get-m3u8-port: "192.168.64.3:30021"     # 此账号对应的M3U8获取服务端口
-# ----------------------------------------------------------------
-  - name: "JP-2"           # 账号名称，方便识别
-    storefront: "jp"     # 账号所属区域 (必须小写, 如 cn, us, jp, hk)
-    media-user-token: "your-media-user-token"
-    # authorization-token: "your-cn-auth-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
-    decrypt-m3u8-port: "192.168.64.3:40020" # 此账号对应的解密服务端口
-    get-m3u8-port: "192.168.64.3:40021"     # 此账号对应的M3U8获取服务端口
+    decrypt-m3u8-port: "192.168.1.132:9998" # 此账号对应的解密服务端口
+    get-m3u8-port: "192.168.1.132:9999"     # 此账号对应的M3U8获取服务端口
 # ----------------------------------------------------------------
 # - name: "US"
 #   storefront: "us"
@@ -69,20 +55,26 @@ cdn-ip: "17.253.117.201"
 qobuz-username: "" # 你的 Qobuz 邮箱
 qobuz-password: "" # 你的 Qobuz 密码
 # ----------------------------------------------------------------  
-# 语言代码, 例如 "zh-CN", "en-GB"，"en-US" 留空则自动检测
+# 元数据语言, 例如 "zh-CN", "en-GB"，"en-US" 留空则自动检测
 # 各区域支持的语言列表: https://gist.github.com/itouakirai/c8ba9df9dc65bd300094103b058731d0
 # 尽量使用英文"en-GB" "en-US" 歌手 - 专辑名 去匹配 Qobuz
 language: "en-GB" 
 # ---------------------------------------------------------------- 
-# 歌词设置
+# 多区域歌词设置
 # 自动识别链接的区域并使用此区域的账号获取歌词
 # 当发起任务的链接区域不在账号列表时,可选账号列表下的区域为默认下载歌词区域
 default-lyric-storefront: "cn"
 # ---------------------------------------------------------------- 
-lrc-type: "lyrics"    # 可选: "lyrics" (普通歌词) 或 "syllable-lyrics" (逐字歌词)
-lrc-format: "lrc"     # 可选: "lrc" 或 "ttml"
-embed-lrc: true       # 是否将歌词嵌入音频文件
-save-lrc-file: false  # 是否将歌词另存为 .lrc 文件
+lrc-type: "syllable-lyrics"    # 可选: "lyrics" (普通歌词) 或 "syllable-lyrics" (逐字歌词与翻译)
+lrc-format: "lrc"              # 可选: "lrc" 或 "ttml"
+embed-lrc: true                # 是否将歌词嵌入音频文件
+save-lrc-file: false           # 是否将歌词另存为 .lrc 文件
+# ---------------------------------------------------------------- 
+# 是否开启双语歌词翻译
+enable-translation: true
+# 目标翻译语言代码
+# 简体中文: zh-Hans-CN, 繁体中文: zh-Hant-TW, 日文: ja, 韩文: ko 等
+translation-language: "zh-Hans-CN"
 # ----------------------------------------------------------------
 #################################
 #经常下载失败请按自身网络环境调整参数 #
@@ -93,27 +85,27 @@ NetworkReadBufferKB: 4096 # kb  #
 # I/O缓冲，过大将导致内存占用过高    #
 BufferSizeKB: 4 # kb            #
 # 下载线程数，最低为 1             #
-aac_downloadthreads: 6          #
-lossless_downloadthreads: 6     #
-hires_downloadthreads: 6        #
+aac_downloadthreads: 5          #
+lossless_downloadthreads: 5     #
+hires_downloadthreads: 5        #
 #################################
 # ---------------------------------------------------------------- 
 # go run main.go 直接回车执行txt模式
 # 从txt文件下载时，同时进行1个任务，过多任务有可能导致下载不稳定
 txtDownloadThreads: 1
 # ----------------------------------------------------------------  
-#是否开启下载完成ffmpeg检测，并重新编码
+# 是否开启下载完成ffmpeg检测，并重新编码
 ffmpeg-fix: false
-#ffmpeg检测参数，可自行调整
+# ffmpeg检测参数，可自行调整
 ffmpeg-check-args: "-v error -f null -"
-#ffmpeg重编码参数，可自行调整
+# ffmpeg重编码参数，可自行调整
 ffmpeg-encode-args: "-map 0:a -map 0:v -c:a alac -c:v copy -f mp4"
 # ---------------------------------------------------------------- 
 # 封面与插图设置
 embed-cover: true
 cover-size: "5000x5000"
 cover-format: "jpg"             # 可选: "jpg", "png", "original"
-save-artist-cover: false        #歌手头像
+save-artist-cover: false        # 歌手头像
 save-animated-artwork: false    # 需要 ffmpeg
 emby-animated-artwork: false    # 需要 ffmpeg
 # ---------------------------------------------------------------- 
@@ -125,7 +117,7 @@ get-m3u8-mode: "hires"    # 可选: "all" (获取所有) 或 "hires" (仅探测H
 aac-type: "aac-lc"        # 可选: "aac-lc", "aac", "aac-binaural", "aac-downmix"
 alac-max: 192000          # 可选: 192000, 96000, 48000, 44100
 atmos-max: 2768           # 可选: 2768, 2448
-download-videos: true     #是否下载视频 true开启，false关闭，需有效的 your-media-user-token 和 mp4decrypt 工具
+download-videos: true     # 是否下载视频 true开启，false关闭，需有效的 your-media-user-token 和 mp4decrypt 工具
 mv-audio-type: "atmos"    # MV音轨偏好, 可选: "atmos", "ac3", "aac"
 mv-max: 2160              # MV视频分辨率偏好
 # ---------------------------------------------------------------- 
@@ -141,8 +133,8 @@ album-folder-format: "{AlbumName}_AM({AlbumId})"
 playlist-folder-format: "{PlaylistName}"
 # 可用变量: {SongId}, {SongNumer}, {SongName}, {DiscNumber}, {TrackNumber}, {Quality}, {Codec}, {Tag}
 song-file-format: "{SongNumer}. {SongName}"
-# 可用变量: {ArtistId}, {ArtistName}, {UrlArtistName}
-artist-folder-format: "{UrlArtistName}" # 留空则不创建艺术家文件夹
+# 可用变量: {ArtistId}, {ArtistName}, {UrlArtistName} 留空则不创建艺术家文件夹
+artist-folder-format: "{UrlArtistName}"
 # ---------------------------------------------------------------- 
 # 特殊标签显示
 explicit-choice: "[E]"
