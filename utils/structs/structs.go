@@ -63,6 +63,8 @@ type ConfigSet struct {
 	EnableCdnOverride       bool      `yaml:"enable-cdn-override"`
 	CdnIp                   string    `yaml:"cdn-ip"`
 	GlobalDecryption        bool      `yaml:"global-decryption"`
+	EnableTranslation       bool      `yaml:"enable-translation"`
+    TranslationLanguage     string    `yaml:"translation-language"`
 }
 
 type Counter struct {
@@ -551,6 +553,7 @@ type SongLyrics struct {
 		} `json:"attributes"`
 	} `json:"data"`
 }
+
 
 
 
