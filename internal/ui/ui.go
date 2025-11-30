@@ -243,7 +243,7 @@ func (pui *ProgressUI) HandleProgress(trackIndex int, progressChan chan runv14.P
 					bs.bar.SetCurrent(0)
 				}
 				bs.bar.SetCurrent(int64(p.Percentage))
-				bs.stateTxt = "解密中"
+				bs.stateTxt = "账号解密中"
 				bs.isDecrypt = true
 			} else {
 				hasStartedDecrypting = false
@@ -252,7 +252,7 @@ func (pui *ProgressUI) HandleProgress(trackIndex int, progressChan chan runv14.P
 				bs.isDecrypt = false
 
 				if p.Percentage >= 100 {
-					bs.stateTxt = "等待解密中"
+					bs.stateTxt = "账号等待解密中"
 				} else {
 					bs.stateTxt = "下载中"
 				}
