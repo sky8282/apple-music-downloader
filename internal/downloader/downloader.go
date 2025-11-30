@@ -773,12 +773,6 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 
 			trackData := meta.Data[0].Relationships.Tracks.Data[trackIndexInMeta-1]
 
-			updateStatus := func(newStatus string, _ func(a ...interface{}) string) {
-				if !jsonOutput && pui != nil {
-					pui.UpdateStatus(trackIndexInMeta, newStatus)
-				}
-			}
-
 			if !jsonOutput && pui != nil {
 				manifest, err := api.GetInfoFromAdam(trackData.ID, mainAccount, storefront)
 				quality := "N/A"
@@ -793,8 +787,13 @@ func Rip(albumId string, storefront string, urlArg_i string, urlRaw string, json
 
 				qualityStr := fmt.Sprintf("(%s)", quality)
 				totalTracks := len(meta.Data[0].Relationships.Tracks.Data)
-
 				pui.AddTrack(trackIndexInMeta, totalTracks, trackData.Attributes.Name, qualityStr)
+			}
+
+			updateStatus := func(newStatus string, _ func(a ...interface{}) string) {
+				if !jsonOutput && pui != nil {
+					pui.UpdateStatus(trackIndexInMeta, newStatus)
+				}
 			}
 
 			core.SharedLock.Lock()
