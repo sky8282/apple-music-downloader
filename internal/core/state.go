@@ -115,12 +115,12 @@ func LoadConfig(configPath string) error {
 		fmt.Println(green("配置文件中未设置 'NetworkReadBufferKB'，自动设为默认值 4096KB (4MB)"))
 	}
 
-	fmt.Printf("%s -> %s\n", green("全区域账号解密"), red(Config.GlobalDecryption))
+	fmt.Printf("%s : %s\n", green("全区域账号解密"), red(Config.GlobalDecryption))
 	useAutoDetect := true
 	if Config.MaxPathLength > 0 {
 		MaxPathLength = Config.MaxPathLength
 		useAutoDetect = false
-		fmt.Printf("%s -> %s\n",
+		fmt.Printf("%s : %s\n",
 			green("从配置文件强制使用最大路径长度限制"),
 			red(fmt.Sprintf("%d", MaxPathLength)),
 		)
@@ -191,10 +191,10 @@ func LoadConfig(configPath string) error {
 		}
 
 		if showAudio && audioCdnIp != "" {
-			fmt.Printf("%s -> %s\n", green("[CDN劫持] [Audio] aod.itunes.apple.com"), red(audioCdnIp))
+			fmt.Printf("%s : %s\n", green("[Audio_CDN 劫持] aod.itunes.apple.com"), red(audioCdnIp))
 		}
 		if showVideo && mvCdnIp != "" {
-			fmt.Printf("%s -> %s\n", green("[CDN劫持] [Video] mvod.itunes.apple.com"), red(mvCdnIp))
+			fmt.Printf("%s : %s\n", green("[Video_CDN 劫持] mvod.itunes.apple.com"), red(mvCdnIp))
 		}
 	}
 
