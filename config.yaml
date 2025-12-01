@@ -33,7 +33,7 @@ accounts:
 #   get-m3u8-port: "127.0.0.1:30021"
 # ----------------------------------------------------------------
 # 是否开启全区域解密
-# true: 使用所有配置的账号（CN, JP, US ...）
+# true: 使用所有配置的账号（CN, JP, US ...）解密
 # false: 仅使用与链接区域匹配的账号解密
 global-decryption: true
 # ----------------------------------------------------------------
@@ -49,33 +49,59 @@ enable-cdn-override: true
 # 香港 17.253.85.201，17.253.85.202，17.253.85.203，17.253.85.204，17.253.85.205，17.253.85.206，17.253.87.195，17.253.87.196，17.253.87.201，17.253.87.203
 # 日本 17.253.69.200，17.253.69.202，17.253.75.201，17.253.75.202
 # 格式1：ip 为音视频通用，格式2：ip,ip 前面的为音频 CDN 逗号后面为视频 CDN，如：cdn-ip: "17.253.117.201,17.253.85.201"
-cdn-ip: "17.253.117.201"
+cdn-ip: "17.253.117.202"
 # ----------------------------------------------------------------
 # Qobuz 账号配置 (用于获取PDF和专辑介绍)，尽量使用 fr 法区
 qobuz-username: "" # 你的 Qobuz 邮箱
 qobuz-password: "" # 你的 Qobuz 密码
 # ----------------------------------------------------------------  
-# 元数据语言, 例如 "zh-CN", "en-GB"，"en-US" 留空则自动检测
+# 语言代码, 例如 "zh-CN", "en-GB"，"en-US" 留空则自动检测
 # 各区域支持的语言列表: https://gist.github.com/itouakirai/c8ba9df9dc65bd300094103b058731d0
 # 尽量使用英文"en-GB" "en-US" 歌手 - 专辑名 去匹配 Qobuz
 language: "en-GB" 
 # ---------------------------------------------------------------- 
-# 多区域歌词设置
+# 歌词设置
 # 自动识别链接的区域并使用此区域的账号获取歌词
 # 当发起任务的链接区域不在账号列表时,可选账号列表下的区域为默认下载歌词区域
 default-lyric-storefront: "cn"
 # ---------------------------------------------------------------- 
 lrc-type: "syllable-lyrics"    # 可选: "lyrics" (普通歌词) 或 "syllable-lyrics" (逐字歌词与翻译)
-lrc-format: "lrc"              # 可选: "lrc" 或 "ttml"
-embed-lrc: true                # 是否将歌词嵌入音频文件
-save-lrc-file: false           # 是否将歌词另存为 .lrc 文件
+lrc-format: "lrc"     # 可选: "lrc" 或 "ttml"
+embed-lrc: true       # 是否将歌词嵌入音频文件
+save-lrc-file: false  # 是否将歌词另存为 .lrc 文件
 # ---------------------------------------------------------------- 
-# 是否开启双语歌词翻译
+# 是否开启歌词翻译
 enable-translation: true
-# 目标翻译语言代码
-# 简体中文: zh-Hans-CN, 繁体中文: zh-Hant-TW, 日文: ja, 韩文: ko 等
+# 官方目标语言: zh-Hans-CN (简体), zh-Hant-TW (繁体), ja (日文), ko (韩文)
 translation-language: "zh-Hans-CN"
 # ----------------------------------------------------------------
+# 第三方目标语言: zh-Hans (简体), zh-Hant (繁体), en (英文)
+translation-language: "zh-Hans" 
+# --- 第三方翻译 api 选择 ---
+# "tencent" "deepl" "microsoft" "google"
+translator-provider: "tencent"
+
+# --- 第三方 api 详细配置 (仅需填写你选择的那一家) ---
+# 1. 腾讯云 (推荐国内使用, 500万字符/月免费)
+tencent:
+  secret-id: ""    # 填写 SecretId
+  secret-key: ""       # 填写 SecretKey
+  region: "ap-shanghai"                                # api 服务器地区
+
+# 2. DeepL (50万字符/月免费)
+deepl:
+  auth-key: ""     # 填写 AuthKey (免费版通常以:fx结尾)
+  is-pro: false    # 是否为 Pro 版
+
+# 3. 微软 Azure (200万字符/月免费)
+microsoft:
+  key: ""
+  region: "eastasia"
+
+# 4. 谷歌 (需魔法网络)
+google:
+  api-key: ""
+# ----------------------------------------------------------------  
 #################################
 #经常下载失败请按自身网络环境调整参数 #
 # m3u8切片数量。                  #
@@ -94,18 +120,18 @@ hires_downloadthreads: 5        #
 # 从txt文件下载时，同时进行1个任务，过多任务有可能导致下载不稳定
 txtDownloadThreads: 1
 # ----------------------------------------------------------------  
-# 是否开启下载完成ffmpeg检测，并重新编码
+#是否开启下载完成ffmpeg检测，并重新编码
 ffmpeg-fix: false
-# ffmpeg检测参数，可自行调整
+#ffmpeg检测参数，可自行调整
 ffmpeg-check-args: "-v error -f null -"
-# ffmpeg重编码参数，可自行调整
+#ffmpeg重编码参数，可自行调整
 ffmpeg-encode-args: "-map 0:a -map 0:v -c:a alac -c:v copy -f mp4"
 # ---------------------------------------------------------------- 
 # 封面与插图设置
 embed-cover: true
 cover-size: "5000x5000"
 cover-format: "jpg"             # 可选: "jpg", "png", "original"
-save-artist-cover: false        # 歌手头像
+save-artist-cover: false        #歌手头像
 save-animated-artwork: false    # 需要 ffmpeg
 emby-animated-artwork: false    # 需要 ffmpeg
 # ---------------------------------------------------------------- 
@@ -117,7 +143,7 @@ get-m3u8-mode: "hires"    # 可选: "all" (获取所有) 或 "hires" (仅探测H
 aac-type: "aac-lc"        # 可选: "aac-lc", "aac", "aac-binaural", "aac-downmix"
 alac-max: 192000          # 可选: 192000, 96000, 48000, 44100
 atmos-max: 2768           # 可选: 2768, 2448
-download-videos: true     # 是否下载视频 true开启，false关闭，需有效的 your-media-user-token 和 mp4decrypt 工具
+download-videos: true     #是否下载视频 true开启，false关闭，需有效的 your-media-user-token 和 mp4decrypt 工具
 mv-audio-type: "atmos"    # MV音轨偏好, 可选: "atmos", "ac3", "aac"
 mv-max: 2160              # MV视频分辨率偏好
 # ---------------------------------------------------------------- 
@@ -133,8 +159,8 @@ album-folder-format: "{AlbumName}_AM({AlbumId})"
 playlist-folder-format: "{PlaylistName}"
 # 可用变量: {SongId}, {SongNumer}, {SongName}, {DiscNumber}, {TrackNumber}, {Quality}, {Codec}, {Tag}
 song-file-format: "{SongNumer}. {SongName}"
-# 可用变量: {ArtistId}, {ArtistName}, {UrlArtistName} 留空则不创建艺术家文件夹
-artist-folder-format: "{UrlArtistName}"
+# 可用变量: {ArtistId}, {ArtistName}, {UrlArtistName}
+artist-folder-format: "{UrlArtistName}" # 留空则不创建艺术家文件夹
 # ---------------------------------------------------------------- 
 # 特殊标签显示
 explicit-choice: "[E]"
