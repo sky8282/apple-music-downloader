@@ -4,11 +4,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"main/internal/core"
+	"main/internal/translator"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/beevik/etree"
 )
+
+var translationLock sync.Mutex
 
 type SongLyrics struct {
 	Data []struct {
@@ -87,41 +93,41 @@ func getSongLyrics(songId string, storefront string, token string, userToken str
 
 func containsCJK(s string) bool {
 	for _, r := range s {
-		if (r >= 0x1100 && r <= 0x11FF) || // Hangul Jamo
-			(r >= 0x2E80 && r <= 0x2EFF) || // CJK Radicals Supplement
-			(r >= 0x2F00 && r <= 0x2FDF) || // Kangxi Radicals
-			(r >= 0x2FF0 && r <= 0x2FFF) || // Ideographic Description Characters
-			(r >= 0x3000 && r <= 0x303F) || // CJK Symbols and Punctuation
-			(r >= 0x3040 && r <= 0x309F) || // Hiragana
-			(r >= 0x30A0 && r <= 0x30FF) || // Katakana
-			(r >= 0x3130 && r <= 0x318F) || // Hangul Compatibility Jamo
-			(r >= 0x31C0 && r <= 0x31EF) || // CJK Strokes
-			(r >= 0x31F0 && r <= 0x31FF) || // Katakana Phonetic Extensions
-			(r >= 0x3200 && r <= 0x32FF) || // Enclosed CJK Letters and Months
-			(r >= 0x3300 && r <= 0x33FF) || // CJK Compatibility
-			(r >= 0x3400 && r <= 0x4DBF) || // CJK Unified Ideographs Extension A
-			(r >= 0x4E00 && r <= 0x9FFF) || // CJK Unified Ideographs
-			(r >= 0xA960 && r <= 0xA97F) || // Hangul Jamo Extended-A
-			(r >= 0xAC00 && r <= 0xD7AF) || // Hangul Syllables
-			(r >= 0xD7B0 && r <= 0xD7FF) || // Hangul Jamo Extended-B
-			(r >= 0xF900 && r <= 0xFAFF) || // CJK Compatibility Ideographs
-			(r >= 0xFE30 && r <= 0xFE4F) || // CJK Compatibility Forms
-			(r >= 0xFF65 && r <= 0xFF9F) || // Halfwidth Katakana
-			(r >= 0xFFA0 && r <= 0xFFDC) || // Halfwidth Jamo
-			(r >= 0x1AFF0 && r <= 0x1AFFF) || // Kana Extended-B
-			(r >= 0x1B000 && r <= 0x1B0FF) || // Kana Supplement
-			(r >= 0x1B100 && r <= 0x1B12F) || // Kana Extended-A
-			(r >= 0x1B130 && r <= 0x1B16F) || // Small Kana Extension
-			(r >= 0x1F200 && r <= 0x1F2FF) || // Enclosed Ideographic Supplement
-			(r >= 0x20000 && r <= 0x2A6DF) || // CJK Unified Ideographs Extension B
-			(r >= 0x2A700 && r <= 0x2B73F) || // CJK Unified Ideographs Extension C
-			(r >= 0x2B740 && r <= 0x2B81F) || // CJK Unified Ideographs Extension D
-			(r >= 0x2B820 && r <= 0x2CEAF) || // CJK Unified Ideographs Extension E
-			(r >= 0x2CEB0 && r <= 0x2EBEF) || // CJK Unified Ideographs Extension F
-			(r >= 0x2EBF0 && r <= 0x2EE5F) || // CJK Unified Ideographs Extension I
-			(r >= 0x2F800 && r <= 0x2FA1F) || // CJK Compatibility Ideographs Supplement
-			(r >= 0x30000 && r <= 0x3134F) || // CJK Unified Ideographs Extension G
-			(r >= 0x31350 && r <= 0x323AF) { // CJK Unified Ideographs Extension H
+		if (r >= 0x1100 && r <= 0x11FF) ||
+			(r >= 0x2E80 && r <= 0x2EFF) ||
+			(r >= 0x2F00 && r <= 0x2FDF) ||
+			(r >= 0x2FF0 && r <= 0x2FFF) ||
+			(r >= 0x3000 && r <= 0x303F) ||
+			(r >= 0x3040 && r <= 0x309F) ||
+			(r >= 0x30A0 && r <= 0x30FF) ||
+			(r >= 0x3130 && r <= 0x318F) ||
+			(r >= 0x31C0 && r <= 0x31EF) ||
+			(r >= 0x31F0 && r <= 0x31FF) ||
+			(r >= 0x3200 && r <= 0x32FF) ||
+			(r >= 0x3300 && r <= 0x33FF) ||
+			(r >= 0x3400 && r <= 0x4DBF) ||
+			(r >= 0x4E00 && r <= 0x9FFF) ||
+			(r >= 0xA960 && r <= 0xA97F) ||
+			(r >= 0xAC00 && r <= 0xD7AF) ||
+			(r >= 0xD7B0 && r <= 0xD7FF) ||
+			(r >= 0xF900 && r <= 0xFAFF) ||
+			(r >= 0xFE30 && r <= 0xFE4F) ||
+			(r >= 0xFF65 && r <= 0xFF9F) ||
+			(r >= 0xFFA0 && r <= 0xFFDC) ||
+			(r >= 0x1AFF0 && r <= 0x1AFFF) ||
+			(r >= 0x1B000 && r <= 0x1B0FF) ||
+			(r >= 0x1B100 && r <= 0x1B12F) ||
+			(r >= 0x1B130 && r <= 0x1B16F) ||
+			(r >= 0x1F200 && r <= 0x1F2FF) ||
+			(r >= 0x20000 && r <= 0x2A6DF) ||
+			(r >= 0x2A700 && r <= 0x2B73F) ||
+			(r >= 0x2B740 && r <= 0x2B81F) ||
+			(r >= 0x2B820 && r <= 0x2CEAF) ||
+			(r >= 0x2CEB0 && r <= 0x2EBEF) ||
+			(r >= 0x2EBF0 && r <= 0x2EE5F) ||
+			(r >= 0x2F800 && r <= 0x2FA1F) ||
+			(r >= 0x30000 && r <= 0x3134F) ||
+			(r >= 0x31350 && r <= 0x323AF) {
 			return true
 		}
 	}
@@ -135,130 +141,248 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 		return "", err
 	}
 
-	var lrcLines []string
+	// 1. 处理逐字歌词 (Word/Syllable)
 	timingAttr := parsedTTML.FindElement("tt").SelectAttr("itunes:timing")
-	if timingAttr != nil {
-		if timingAttr.Value == "Word" {
-			lrc, err := conventSyllableTTMLToLRC(ttml, enableTranslation)
-			return lrc, err
-		}
-		if timingAttr.Value == "None" {
-			for _, p := range parsedTTML.FindElements("//p") {
-				line := p.Text()
-				line = strings.TrimSpace(line)
-				if line != "" {
-					lrcLines = append(lrcLines, line)
+	if timingAttr != nil && timingAttr.Value == "Word" {
+		hasOfficialTrans := false
+		if head := parsedTTML.FindElement("tt").FindElement("head"); head != nil {
+			if meta := head.FindElement("metadata"); meta != nil {
+				if iTunesMetadata := meta.FindElement("iTunesMetadata"); iTunesMetadata != nil {
+					if len(iTunesMetadata.FindElements("translations")) > 0 {
+						hasOfficialTrans = true
+					}
 				}
 			}
-			return strings.Join(lrcLines, "\n"), nil
+		}
+
+		if hasOfficialTrans || !enableTranslation {
+			lrc, err := conventSyllableTTMLToLRC(ttml, enableTranslation)
+			if err == nil {
+				if !enableTranslation {
+					return lrc, nil
+				}
+				// 检查官方翻译有效性（是否有中文）
+				if containsCJK(lrc) {
+					return lrc, nil
+				}
+				// 官方翻译无效，降级处理...
+			}
 		}
 	}
 
-	for _, item := range parsedTTML.FindElement("tt").FindElement("body").ChildElements() {
-		for _, lyric := range item.ChildElements() {
-			var h, m, s, ms int
-			beginAttr := lyric.SelectAttr("begin")
-			if beginAttr == nil {
-				return "", errors.New("no synchronised lyrics")
+	// 2. 纯文本模式 (None)
+	if timingAttr != nil && timingAttr.Value == "None" {
+		var lrcLines []string
+		for _, p := range parsedTTML.FindElements("//p") {
+			lrcLines = append(lrcLines, strings.TrimSpace(p.Text()))
+		}
+		return strings.Join(lrcLines, "\n"), nil
+	}
+
+	// 3. 普通行歌词处理 (Line-by-Line，含递归查找)
+	type LyricLine struct {
+		M, S, MS int
+		Text     string
+		Trans    string
+	}
+	var lines []LyricLine
+
+	body := parsedTTML.FindElement("tt").FindElement("body")
+	if body == nil {
+		return "", errors.New("invalid ttml: no body")
+	}
+
+	var iTunesMetadata *etree.Element
+	if head := parsedTTML.FindElement("tt").FindElement("head"); head != nil {
+		if meta := head.FindElement("metadata"); meta != nil {
+			iTunesMetadata = meta.FindElement("iTunesMetadata")
+		}
+	}
+
+	// 递归查找真正的歌词行元素
+	// 如果一个 div/p 包含子 div/p，说明它是容器，继续钻
+	// 如果一个 div/p 只包含 span 或 text，说明它是行
+	var elements []*etree.Element
+	var collectElements func(e *etree.Element)
+	collectElements = func(e *etree.Element) {
+		isContainer := false
+		for _, child := range e.ChildElements() {
+			if child.Tag == "div" || child.Tag == "p" {
+				isContainer = true
+				break
 			}
-			beginValue := beginAttr.Value
-			if strings.Contains(beginValue, ":") {
-				_, err = fmt.Sscanf(beginValue, "%d:%d:%d.%d", &h, &m, &s, &ms)
-				if err != nil {
-					_, err = fmt.Sscanf(beginValue, "%d:%d.%d", &m, &s, &ms)
-					if err != nil {
-						_, err = fmt.Sscanf(beginValue, "%d:%d", &m, &s)
-					}
-					h = 0
-				}
-			} else {
-				_, err = fmt.Sscanf(beginValue, "%d.%d", &s, &ms)
-				h, m = 0, 0
+		}
+
+		if isContainer {
+			for _, child := range e.ChildElements() {
+				collectElements(child)
 			}
-			if err != nil {
-				return "", err
-			}
-			m += h * 60
-			ms = ms / 10
-			var text, transText, translitText string
-			if len(parsedTTML.FindElement("tt").FindElements("head")) > 0 {
-				if len(parsedTTML.FindElement("tt").FindElement("head").FindElements("metadata")) > 0 {
-					Metadata := parsedTTML.FindElement("tt").FindElement("head").FindElement("metadata")
-					if len(Metadata.FindElements("iTunesMetadata")) > 0 {
-						iTunesMetadata := Metadata.FindElement("iTunesMetadata")
-						if len(iTunesMetadata.FindElements("transliterations")) > 0 {
-							if len(iTunesMetadata.FindElement("transliterations").FindElements("transliteration")) > 0 {
-								xpath := fmt.Sprintf("text[@for='%s']", lyric.SelectAttr("itunes:key").Value)
-								translit := iTunesMetadata.FindElement("transliterations").FindElement("transliteration").FindElement(xpath)
-								if translit != nil {
-									if translit.SelectAttr("text") != nil {
-										translitText = translit.SelectAttr("text").Value
-									} else {
-										var translitTmp []string
-										for _, span := range translit.Child {
-											if c, ok := span.(*etree.CharData); ok {
-												translitTmp = append(translitTmp, c.Data)
-											} else if e, ok := span.(*etree.Element); ok {
-												translitTmp = append(translitTmp, e.Text())
-											}
-										}
-										translitText = strings.Join(translitTmp, "")
-									}
-								}
-							}
-						}
-						if enableTranslation {
-							if len(iTunesMetadata.FindElements("translations")) > 0 {
-								if len(iTunesMetadata.FindElement("translations").FindElements("translation")) > 0 {
-									xpath := fmt.Sprintf("text[@for='%s']", lyric.SelectAttr("itunes:key").Value)
-									trans := iTunesMetadata.FindElement("translations").FindElement("translation").FindElement(xpath)
-									if trans != nil {
-										if trans.SelectAttr("text") != nil {
-											transText = trans.SelectAttr("text").Value
-										} else {
-											var transTmp []string
-											for _, span := range trans.Child {
-												if c, ok := span.(*etree.CharData); ok {
-													transTmp = append(transTmp, c.Data)
-												} else if e, ok := span.(*etree.Element); ok {
-													transTmp = append(transTmp, e.Text())
-												}
-											}
-											transText = strings.Join(transTmp, "")
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-			if lyric.SelectAttr("text") == nil {
-				var textTmp []string
-				for _, span := range lyric.Child {
-					if _, ok := span.(*etree.CharData); ok {
-						textTmp = append(textTmp, span.(*etree.CharData).Data)
-					} else {
-						textTmp = append(textTmp, span.(*etree.Element).Text())
-					}
-				}
-				text = strings.Join(textTmp, "")
-			} else {
-				text = lyric.SelectAttr("text").Value
-			}
-			if len(translitText) > 0 && containsCJK(text) {
-				lrcLines = append(lrcLines, fmt.Sprintf("[%02d:%02d.%02d]%s", m, s, ms, translitText))
-			} else {
-				lrcLines = append(lrcLines, fmt.Sprintf("[%02d:%02d.%02d]%s", m, s, ms, text))
-			}
-			if enableTranslation && len(transText) > 0 {
-				lrcLines = append(lrcLines, fmt.Sprintf("[%02d:%02d.%02d]%s", m, s, ms, transText))
+		} else {
+			// 只有带有 begin 属性的才算作有效行
+			if e.SelectAttr("begin") != nil {
+				elements = append(elements, e)
 			}
 		}
 	}
-	return strings.Join(lrcLines, "\n"), nil
+
+	// 开始递归收集
+	for _, child := range body.ChildElements() {
+		collectElements(child)
+	}
+
+	// 时间解析函数 (增强版：自动处理秒数进位)
+	parseTime := func(timeValue string) (int, int, int, error) {
+		var h, m, s, ms int
+		// 格式: hh:mm:ss.ms 或 mm:ss.ms
+		if strings.Contains(timeValue, ":") {
+			_, err = fmt.Sscanf(timeValue, "%d:%d:%d.%d", &h, &m, &s, &ms)
+			if err != nil {
+				_, err = fmt.Sscanf(timeValue, "%d:%d.%d", &m, &s, &ms)
+				h = 0
+			}
+		} else {
+			// 格式: sssss.ms (纯秒数)
+			_, err = fmt.Sscanf(timeValue, "%d.%d", &s, &ms)
+			h, m = 0, 0
+		}
+		
+		if err != nil {
+			return 0, 0, 0, err
+		}
+
+		// 标准化时间: 处理秒数溢出 (例如 71秒 -> 1分11秒)
+		totalSeconds := h*3600 + m*60 + s
+		
+		finalM := totalSeconds / 60
+		finalS := totalSeconds % 60
+		finalMS := ms / 10 // 毫秒转为两位数
+
+		return finalM, finalS, finalMS, nil
+	}
+
+	for _, el := range elements {
+		beginValue := el.SelectAttr("begin").Value
+		
+		var l LyricLine
+		var err error
+		l.M, l.S, l.MS, err = parseTime(beginValue)
+		if err != nil {
+			continue
+		}
+
+		// 文本提取逻辑 (深度提取，兼容 span)
+		var textBuilder strings.Builder
+		
+		// 如果标签本身有 text 属性 (普通 p)
+		if attr := el.SelectAttr("text"); attr != nil {
+			textBuilder.WriteString(attr.Value)
+		} else {
+			// 否则遍历子元素拼接 (div/span)
+			childIndex := 0
+			for _, childToken := range el.Child {
+				// 处理纯文本
+				if cd, ok := childToken.(*etree.CharData); ok {
+					// 忽略无意义的空白，除非在词之间
+					if strings.TrimSpace(cd.Data) != "" || childIndex > 0 {
+						// 可以在这里处理空格逻辑，简单起见暂不处理
+					}
+				}
+				
+				// 处理 span 元素
+				if childElem, ok := childToken.(*etree.Element); ok {
+					if childIndex > 0 {
+						textBuilder.WriteString(" ")
+					}
+					
+					var extractedText string
+					if attr := childElem.SelectAttr("text"); attr != nil {
+						extractedText = attr.Value
+					} else {
+						// 递归获取 span 内部所有文本
+						extractedText = childElem.Text()
+					}
+					textBuilder.WriteString(extractedText)
+					childIndex++
+				}
+			}
+			// 如果没有子元素，尝试直接获取自身文本
+			if textBuilder.Len() == 0 {
+				textBuilder.WriteString(el.Text())
+			}
+		}
+		
+		l.Text = textBuilder.String()
+
+		// 尝试获取官方翻译
+		if enableTranslation && iTunesMetadata != nil {
+			key := el.SelectAttr("itunes:key")
+			if key != nil {
+				xpath := fmt.Sprintf("translations/translation/text[@for='%s']", key.Value)
+				if transNode := iTunesMetadata.FindElement(xpath); transNode != nil {
+					if transNode.SelectAttr("text") != nil {
+						l.Trans = transNode.SelectAttr("text").Value
+					} else {
+						l.Trans = transNode.Text()
+					}
+				}
+			}
+		}
+		lines = append(lines, l)
+	}
+
+	// 4. API 翻译逻辑
+	hasOfficialTrans := false
+	for _, l := range lines {
+		if l.Trans != "" {
+			hasOfficialTrans = true
+			break
+		}
+	}
+
+	if enableTranslation && !hasOfficialTrans {
+		var textsToTranslate []string
+		for _, l := range lines {
+			if strings.TrimSpace(l.Text) != "" {
+				textsToTranslate = append(textsToTranslate, l.Text)
+			}
+		}
+
+		if len(textsToTranslate) > 0 {
+			translationLock.Lock()
+			time.Sleep(200 * time.Millisecond)
+
+			transEngine, err := translator.New(core.Config)
+			if err == nil {
+				translatedTexts, err := transEngine.Translate(textsToTranslate, core.Config.TranslationLanguage)
+				if err == nil {
+					transIndex := 0
+					for i := range lines {
+						if strings.TrimSpace(lines[i].Text) != "" {
+							if transIndex < len(translatedTexts) {
+								lines[i].Trans = translatedTexts[transIndex]
+								transIndex++
+							}
+						}
+					}
+				}
+			}
+			translationLock.Unlock()
+		}
+	}
+
+	// 5. 输出
+	var lrcBuilder strings.Builder
+	for _, l := range lines {
+		lrcBuilder.WriteString(fmt.Sprintf("[%02d:%02d.%02d]%s\n", l.M, l.S, l.MS, l.Text))
+		if l.Trans != "" {
+			lrcBuilder.WriteString(fmt.Sprintf("[%02d:%02d.%02d]%s\n", l.M, l.S, l.MS, l.Trans))
+		}
+	}
+
+	return strings.TrimSpace(lrcBuilder.String()), nil
 }
 
+// conventSyllableTTMLToLRC (保持不变)
 func conventSyllableTTMLToLRC(ttml string, enableTranslation bool) (string, error) {
 	parsedTTML := etree.NewDocument()
 	err := parsedTTML.ReadFromString(ttml)
@@ -281,8 +405,13 @@ func conventSyllableTTMLToLRC(ttml string, enableTranslation bool) (string, erro
 		if err != nil {
 			return "", err
 		}
-		m += h * 60
+		
+		// 同样应用时间标准化逻辑，防止逐字模式下也有奇怪时间戳
+		totalSeconds := h*3600 + m*60 + s
+		m = totalSeconds / 60
+		s = totalSeconds % 60
 		ms = ms / 10
+
 		if newLine == 0 {
 			return fmt.Sprintf("[%02d:%02d.%02d]", m, s, ms), nil
 		} else if newLine == -1 {
