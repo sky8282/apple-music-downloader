@@ -65,6 +65,12 @@ type ConfigSet struct {
 	GlobalDecryption        bool      `yaml:"global-decryption"`
 	EnableTranslation       bool      `yaml:"enable-translation"`
     TranslationLanguage     string    `yaml:"translation-language"`
+    TranslationTarget       string    `yaml:"translation-target"`
+    TranslatorProvider      string    `yaml:"translator-provider"`
+    Tencent                 TencentConfig   `yaml:"tencent"`
+    DeepL                   DeepLConfig     `yaml:"deepl"`
+    Microsoft               MicrosoftConfig `yaml:"microsoft"`
+    Google                  GoogleConfig    `yaml:"google"`
 }
 
 type Counter struct {
@@ -73,6 +79,26 @@ type Counter struct {
 	Error       int
 	Success     int
 	Total       int
+}
+
+type TencentConfig struct {
+    SecretId  string `yaml:"secret-id"`
+    SecretKey string `yaml:"secret-key"`
+    Region    string `yaml:"region"`
+}
+
+type DeepLConfig struct {
+    AuthKey string `yaml:"auth-key"`
+    IsPro   bool   `yaml:"is-pro"`
+}
+
+type MicrosoftConfig struct {
+    Key    string `yaml:"key"`
+    Region string `yaml:"region"`
+}
+
+type GoogleConfig struct {
+    ApiKey string `yaml:"api-key"`
 }
 
 type ApiResult struct {
@@ -553,8 +579,6 @@ type SongLyrics struct {
 		} `json:"attributes"`
 	} `json:"data"`
 }
-
-
 
 
 
