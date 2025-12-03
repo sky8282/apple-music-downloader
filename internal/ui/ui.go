@@ -103,6 +103,7 @@ func (pui *ProgressUI) AddTrack(trackIndex, totalTracks int, trackName, qualityS
 
 	bar, _ := pui.p.Add(100,
 		nil,
+		mpb.BarRemoveOnComplete(),
 		mpb.PrependDecorators(
 			decor.Any(func(s decor.Statistics) string {
 				bs.statusMu.Lock()
@@ -263,11 +264,6 @@ func (pui *ProgressUI) HandleProgress(trackIndex int, progressChan chan runv14.P
 }
 
 func (pui *ProgressUI) SetDone(trackIndex int, status string) {
-	if strings.Contains(status, "下载完成") {
-		pui.UpdateStatus(trackIndex, status)
-		return
-	}
-
 	pui.mu.Lock()
 	bs, ok := pui.bars[trackIndex]
 	if ok {
@@ -282,7 +278,7 @@ func (pui *ProgressUI) SetDone(trackIndex int, status string) {
 		bs.isDone = true
 		bs.statusMu.Unlock()
 
-		bs.bar.Abort(true)
+		bs.bar.SetTotal(0, true)
 
 		red := color.New(color.FgRed).SprintFunc()
 		green := color.New(color.FgGreen).SprintFunc()
