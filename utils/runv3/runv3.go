@@ -370,15 +370,15 @@ func Run(adamId string, trackpath string, authtoken string, mutoken string, mvmo
 		return keyAndUrls, nil
 	}
 	body := extsong(fileurl)
-	fmt.Print("Downloaded\n")
+	//fmt.Print("Downloaded\n")
 	var buffer bytes.Buffer
 
 	err = DecryptMP4(&body, keybt, &buffer)
 	if err != nil {
-		fmt.Print("Decryption failed\n")
+		//fmt.Print("Decryption failed\n")
 		return "", err
 	} else {
-		fmt.Print("Decrypted\n")
+		//fmt.Print("Decrypted\n")
 	}
 	ofh, err := os.Create(trackpath)
 	if err != nil {
