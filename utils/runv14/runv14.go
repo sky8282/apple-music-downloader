@@ -189,7 +189,7 @@ func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, n
 	go func() {
 		var totalDownloadedBytes int64
 		var lastReportedBytes int64
-		ticker := time.NewTicker(500 * time.Millisecond)
+		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
 
 		for {
@@ -201,7 +201,7 @@ func downloadFileInChunks(fileUrl string, header http.Header, totalSize int64, n
 				}
 				totalDownloadedBytes += bytes
 			case <-ticker.C:
-				speed := float64(totalDownloadedBytes-lastReportedBytes) / 0.5
+				speed := float64(totalDownloadedBytes-lastReportedBytes) / 0.1
 				lastReportedBytes = totalDownloadedBytes
 
 				percentage := int(float64(totalDownloadedBytes) * 100 / float64(totalSize))
@@ -349,12 +349,20 @@ func downloadAndDecryptFile(conn net.Conn, in io.Reader, totalSize int64, outfil
 	var lastReportedOffset uint64
 	lastReportTime := time.Now()
 
+	if progressChan != nil {
+		progressChan <- ProgressUpdate{Percentage: 0, SpeedBPS: 0, Stage: "decrypt"}
+	}
+
 	for i := 0; ; i++ {
-		if totalSize > 0 && time.Since(lastReportTime) > 500*time.Millisecond {
+		if totalSize > 0 && (i == 0 || time.Since(lastReportTime) > 50*time.Millisecond) {
 			elapsedSeconds := time.Since(lastReportTime).Seconds()
-			speed := float64(offset-lastReportedOffset) / elapsedSeconds
+			speed := 0.0
+			if elapsedSeconds > 0 {
+				speed = float64(offset-lastReportedOffset) / elapsedSeconds
+			}
 			lastReportedOffset = offset
 			lastReportTime = time.Now()
+
 			percentage := int(float64(offset) * 100 / float64(totalSize))
 			if percentage > 100 {
 				percentage = 100
