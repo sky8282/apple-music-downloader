@@ -125,6 +125,11 @@ func (pui *ProgressUI) AddTrack(trackIndex, totalTracks int, trackName, qualityS
 					speed = "- MB/s"
 				}
 
+				p := int64(0)
+				if s.Total > 0 {
+					p = s.Current * 100 / s.Total
+				}
+
 				state := bs.stateTxt
 				acc := bs.account
 
@@ -134,11 +139,13 @@ func (pui *ProgressUI) AddTrack(trackIndex, totalTracks int, trackName, qualityS
 					fullState = fmt.Sprintf("%s %s", acc, state)
 				}
 
-				if strings.Contains(state, "等待解密") {
+				if strings.Contains(state, "元数据") {
 					statusStr = cyan(fullState)
+				} else if strings.Contains(state, "等待解密") {
+					statusStr = yellow(fullState)
 				} else if strings.Contains(state, "完成") || strings.Contains(state, "已存在") {
 					statusStr = green(fullState)
-				} else if bs.isDecrypt || strings.Contains(state, "解密") || strings.Contains(state, "封装") || strings.Contains(state, "处理") || strings.Contains(state, "失败") {
+				} else if bs.isDecrypt || strings.Contains(state, "解密") || strings.Contains(state, "封装") || strings.Contains(state, "处理") || strings.Contains(state, "失败") || strings.Contains(state, "写入") {
 					statusStr = red(fullState)
 				} else {
 					statusStr = yellow(fullState)
@@ -147,15 +154,13 @@ func (pui *ProgressUI) AddTrack(trackIndex, totalTracks int, trackName, qualityS
 				if strings.Contains(state, "元数据") || strings.Contains(state, "等待解密") || strings.Contains(state, "完成") || strings.Contains(state, "已存在") || strings.Contains(state, "失败") {
 					return fmt.Sprintf(" [%s]", statusStr)
 				}
-
+				if p >= 100 || strings.Contains(state, "写入") || strings.Contains(state, "封装") || strings.Contains(state, "处理") {
+					return fmt.Sprintf(" %3d %%       [%s]", p, statusStr)
+				}
 				if strings.Contains(state, "解密") {
-					return fmt.Sprintf(" [%s] [%s]", speed, statusStr)
+					return fmt.Sprintf(" %3d %% [%s] [%s]", p, speed, statusStr)
 				}
 
-				p := int64(0)
-				if s.Total > 0 {
-					p = s.Current * 100 / s.Total
-				}
 				return fmt.Sprintf(" %3d %% [%s] [%s]", p, speed, statusStr)
 			}),
 		),
@@ -177,7 +182,7 @@ func (pui *ProgressUI) UpdateStatus(trackIndex int, newStatus string) {
 			return
 		}
 		bs.stateTxt = newStatus
-		if strings.Contains(newStatus, "解密") || strings.Contains(newStatus, "封装") || strings.Contains(newStatus, "处理") {
+		if strings.Contains(newStatus, "解密") || strings.Contains(newStatus, "封装") || strings.Contains(newStatus, "处理") || strings.Contains(newStatus, "写入") {
 			bs.isDecrypt = true
 		}
 	}
@@ -220,10 +225,7 @@ func (pui *ProgressUI) HandleProgress(trackIndex int, progressChan chan runv14.P
 				bs.statusMu.Unlock()
 				return
 			}
-
-			if p.SpeedBPS > 0 {
-				bs.speedStr = utils.FormatSpeed(p.SpeedBPS)
-			}
+			bs.speedStr = utils.FormatSpeed(p.SpeedBPS)
 			bs.account = accountName
 
 			if p.Stage == "decrypt" {
@@ -233,7 +235,15 @@ func (pui *ProgressUI) HandleProgress(trackIndex int, progressChan chan runv14.P
 					bs.bar.SetCurrent(0)
 				}
 				bs.bar.SetCurrent(int64(p.Percentage))
-				bs.stateTxt = "账号解密中"
+				
+				if p.Percentage >= 100 {
+					bs.stateTxt = "元数据写入中"
+				} else if p.Percentage == 0 {
+					bs.stateTxt = "账号等待解密中"
+				} else {
+					bs.stateTxt = "账号解密中"
+				}
+
 				bs.isDecrypt = true
 			} else {
 				hasStartedDecrypting = false
