@@ -70,6 +70,7 @@ npm run build
 
 
 ## wrapper - web 管理器，多账号多端口解密
+* 可选: config.yaml 里可填写负载均衡端口 或者 ( 填写直连各个进程端口，如4个端口就必须有4个账号区域的配置 )
 
 https://github.com/sky8282/wrapper-manager-v1
 
