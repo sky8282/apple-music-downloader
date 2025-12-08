@@ -134,6 +134,53 @@ func containsCJK(s string) bool {
 	return false
 }
 
+func isTraditionalChinese(s string) bool {
+	for _, r := range s {
+		switch r {
+		case
+			'們', '麼', '這', '沒', '來', '個', '對', '爲', '為', '儘', '倆', '爾', '誰', '幾', '雖',
+			'讓', '與', '問', '應', '該', '實', '現', '謝', '聽', '說', '讀', '寫', '畫', '習', '覺', '學', '愛', '戀', '驚', '憂', '懷', '憶', '懼',
+			'種', '樣', '從', '後', '裡', '進', '過', '達', '還', '運', '邊', '遠', '處', '場', '確', '認', '識', '聲', '響', '樂', '氣', '電', '腦', '號', '圖', '區', '點',
+			'風', '雲', '霧', '塵', '葉', '樹', '蘭', '藝', '藥', '頭', '髮', '顏', '頸', '體', '齒', '魚', '鳥', '龍', '龜', '馬',
+			'門', '開', '關', '閒', '闊', '閱', '錢', '銀', '鐘', '鐵', '錯', '錄', '鏡', '貝', '貧', '貨', '購', '贈', '賭', '賢', '質', '賴', '車', '轉', '輪', '輕', '載', '專', '傳', '韋', '衛', '頁', '頂', '順', '須', '預', '頌',
+			'東', '華', '戰', '鬥', '農', '業', '權', '導', '媽', '嗎', '筆', '幣', '畢', '閉', '婦', '孫', '陣', '陳', '陰', '陽', '際', '陸', '隊', '階', '隨', '險', '隱', '雜', '難', '劇', '勵', '歡', '歐', '毆', '嚴', '歸', '當',
+			'傷', '淚', '涙', '淒', '慘', '慾', '懸', '夢', '憤', '願',
+			'擁', '揮', '揚', '擺', '牽', '撐', '擱', '擊', '盪', '揹', '捨', '採', '掙', '掃', '擋', '擾', '揀',
+			'燈', '燒', '燦', '煙', '熾', '熱', '爍', '燼', '煉', '煩',
+			'島', '嶼', '嵐', '崗', '崖', '嶄', '嶺', '巔', '崑', '嶸', '巖', '壑',
+			'詩', '詞', '話', '語', '談', '誤', '課', '調', '諾', '詢', '諦', '譜', '譯', '證', '誌',
+			'歲', '舊', '曉', '曖', '曠', '晝', '曆', '昇',
+			'彌', '遙', '遲', '邁', '遵', '違', '鄉', '鄭',
+			'飄', '燭', '閃', '艷',
+			'牆', '樓', '樑', '櫻', '櫥', '櫃', '樺', '榮', '構', '橋', '檔', '欄',
+			'鋼', '錦', '鎖', '鎮', '鏽', '鑽', '鑄', '鑑', '錘', '鈴', '鋒', '鐺', '鍊', '鍛', '鍵',
+			'惱', '惋', '惻',
+			'靈', '霽', '颶', '颱', '飆',
+			'歎', '歛',
+			'輩', '辦', '邏', '輿', '輯', '輸', '軍', '郵',
+			'製', '縱', '績', '繼', '續', '緣', '線', '繞', '編', '緩', '縮', '綻', '紛',
+			'恒', '慟', '慣', '悶',
+			'靜', '寧',
+			'廣', '廳', '庫', '廢',
+			'飛', '鳳', '鳴', '鷹', '鷺', '鷗', '鴉',
+			'鯨', '鰻', '鮮', '鱗', '鱷',
+			'獸',
+			'戲', '槍', '劍', '劃', '勳',
+			'僕', '賞', '賠', '賤', '賬', '贖', '販', '貢', '財', '貴',
+			'隴',
+			'鬧', '鬱', '鬆', '鬨', '鬢', '鬍',
+			'綺', '絕', '純', '紗', '給', '統', '繪', '緒', '練', '繫', '網',
+			'驕', '駕', '駛', '騎', '驟', '駿', '騰', '驥',
+			'驅', '騙', '驛', '騷',
+			'鴿', '鴻', '鵬', '鶴',
+			'鯊', '鮭',
+			'啟', '嘆', '嚮', '嚇', '囂', '囈', '囀', '嚨':
+			return true
+		}
+	}
+	return false
+}
+
 func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 	parsedTTML := etree.NewDocument()
 	err := parsedTTML.ReadFromString(ttml)
@@ -141,45 +188,80 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 		return "", err
 	}
 
-	// 1. 处理逐字歌词 (Word/Syllable)
+	var iTunesMetadata *etree.Element
+	if head := parsedTTML.FindElement("tt").FindElement("head"); head != nil {
+		if meta := head.FindElement("metadata"); meta != nil {
+			iTunesMetadata = meta.FindElement("iTunesMetadata")
+		}
+	}
+
+	hasOfficialTrans := false
+	if iTunesMetadata != nil {
+		if len(iTunesMetadata.FindElements("translations")) > 0 {
+			hasOfficialTrans = true
+		}
+	}
+
 	timingAttr := parsedTTML.FindElement("tt").SelectAttr("itunes:timing")
+
 	if timingAttr != nil && timingAttr.Value == "Word" {
-		hasOfficialTrans := false
-		if head := parsedTTML.FindElement("tt").FindElement("head"); head != nil {
-			if meta := head.FindElement("metadata"); meta != nil {
-				if iTunesMetadata := meta.FindElement("iTunesMetadata"); iTunesMetadata != nil {
-					if len(iTunesMetadata.FindElements("translations")) > 0 {
-						hasOfficialTrans = true
-					}
-				}
-			}
+		rawLrc, _ := conventSyllableTTMLToLRC(ttml, false)
+		if isTraditionalChinese(rawLrc) {
+			return rawLrc, nil
+		}
+		
+		if !enableTranslation {
+			return rawLrc, nil
 		}
 
-		if hasOfficialTrans || !enableTranslation {
-			lrc, err := conventSyllableTTMLToLRC(ttml, enableTranslation)
+		if hasOfficialTrans {
+			lrcWithTrans, err := conventSyllableTTMLToLRC(ttml, true)
 			if err == nil {
-				if !enableTranslation {
-					return lrc, nil
+				if containsCJK(lrcWithTrans) {
+					return lrcWithTrans, nil
 				}
-				// 检查官方翻译有效性（是否有中文）
-				if containsCJK(lrc) {
-					return lrc, nil
-				}
-				// 官方翻译无效，降级处理...
 			}
 		}
 	}
 
-	// 2. 纯文本模式 (None)
 	if timingAttr != nil && timingAttr.Value == "None" {
-		var lrcLines []string
+		var lines []string
 		for _, p := range parsedTTML.FindElements("//p") {
-			lrcLines = append(lrcLines, strings.TrimSpace(p.Text()))
+			text := strings.TrimSpace(p.Text())
+			if text != "" {
+				lines = append(lines, text)
+			}
 		}
-		return strings.Join(lrcLines, "\n"), nil
+
+		fullText := strings.Join(lines, "")
+		if isTraditionalChinese(fullText) {
+			return strings.Join(lines, "\n"), nil
+		}
+
+		if enableTranslation {
+			translationLock.Lock()
+			time.Sleep(200 * time.Millisecond)
+			transEngine, err := translator.New(core.Config)
+			if err == nil {
+				translatedTexts, err := transEngine.Translate(lines, core.Config.TranslationLanguage)
+				if err == nil && len(translatedTexts) == len(lines) {
+					var resultLines []string
+					for i, line := range lines {
+						resultLines = append(resultLines, line)
+						if translatedTexts[i] != "" {
+							resultLines = append(resultLines, translatedTexts[i])
+						}
+					}
+					translationLock.Unlock()
+					return strings.Join(resultLines, "\n"), nil
+				}
+			}
+			translationLock.Unlock()
+		}
+		
+		return strings.Join(lines, "\n"), nil
 	}
 
-	// 3. 普通行歌词处理 (Line-by-Line，含递归查找)
 	type LyricLine struct {
 		M, S, MS int
 		Text     string
@@ -192,16 +274,6 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 		return "", errors.New("invalid ttml: no body")
 	}
 
-	var iTunesMetadata *etree.Element
-	if head := parsedTTML.FindElement("tt").FindElement("head"); head != nil {
-		if meta := head.FindElement("metadata"); meta != nil {
-			iTunesMetadata = meta.FindElement("iTunesMetadata")
-		}
-	}
-
-	// 递归查找真正的歌词行元素
-	// 如果一个 div/p 包含子 div/p，说明它是容器，继续钻
-	// 如果一个 div/p 只包含 span 或 text，说明它是行
 	var elements []*etree.Element
 	var collectElements func(e *etree.Element)
 	collectElements = func(e *etree.Element) {
@@ -212,28 +284,22 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 				break
 			}
 		}
-
 		if isContainer {
 			for _, child := range e.ChildElements() {
 				collectElements(child)
 			}
 		} else {
-			// 只有带有 begin 属性的才算作有效行
 			if e.SelectAttr("begin") != nil {
 				elements = append(elements, e)
 			}
 		}
 	}
-
-	// 开始递归收集
 	for _, child := range body.ChildElements() {
 		collectElements(child)
 	}
 
-	// 时间解析函数 (增强版：自动处理秒数进位)
 	parseTime := func(timeValue string) (int, int, int, error) {
 		var h, m, s, ms int
-		// 格式: hh:mm:ss.ms 或 mm:ss.ms
 		if strings.Contains(timeValue, ":") {
 			_, err = fmt.Sscanf(timeValue, "%d:%d:%d.%d", &h, &m, &s, &ms)
 			if err != nil {
@@ -241,28 +307,21 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 				h = 0
 			}
 		} else {
-			// 格式: sssss.ms (纯秒数)
 			_, err = fmt.Sscanf(timeValue, "%d.%d", &s, &ms)
 			h, m = 0, 0
 		}
-		
 		if err != nil {
 			return 0, 0, 0, err
 		}
-
-		// 标准化时间: 处理秒数溢出 (例如 71秒 -> 1分11秒)
 		totalSeconds := h*3600 + m*60 + s
-		
 		finalM := totalSeconds / 60
 		finalS := totalSeconds % 60
-		finalMS := ms / 10 // 毫秒转为两位数
-
+		finalMS := ms / 10
 		return finalM, finalS, finalMS, nil
 	}
 
 	for _, el := range elements {
 		beginValue := el.SelectAttr("begin").Value
-		
 		var l LyricLine
 		var err error
 		l.M, l.S, l.MS, err = parseTime(beginValue)
@@ -270,50 +329,36 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 			continue
 		}
 
-		// 文本提取逻辑 (深度提取，兼容 span)
 		var textBuilder strings.Builder
-		
-		// 如果标签本身有 text 属性 (普通 p)
 		if attr := el.SelectAttr("text"); attr != nil {
 			textBuilder.WriteString(attr.Value)
 		} else {
-			// 否则遍历子元素拼接 (div/span)
 			childIndex := 0
 			for _, childToken := range el.Child {
-				// 处理纯文本
 				if cd, ok := childToken.(*etree.CharData); ok {
-					// 忽略无意义的空白，除非在词之间
 					if strings.TrimSpace(cd.Data) != "" || childIndex > 0 {
-						// 可以在这里处理空格逻辑，简单起见暂不处理
 					}
 				}
-				
-				// 处理 span 元素
 				if childElem, ok := childToken.(*etree.Element); ok {
 					if childIndex > 0 {
 						textBuilder.WriteString(" ")
 					}
-					
 					var extractedText string
 					if attr := childElem.SelectAttr("text"); attr != nil {
 						extractedText = attr.Value
 					} else {
-						// 递归获取 span 内部所有文本
 						extractedText = childElem.Text()
 					}
 					textBuilder.WriteString(extractedText)
 					childIndex++
 				}
 			}
-			// 如果没有子元素，尝试直接获取自身文本
 			if textBuilder.Len() == 0 {
 				textBuilder.WriteString(el.Text())
 			}
 		}
-		
 		l.Text = textBuilder.String()
 
-		// 尝试获取官方翻译
 		if enableTranslation && iTunesMetadata != nil {
 			key := el.SelectAttr("itunes:key")
 			if key != nil {
@@ -330,47 +375,61 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 		lines = append(lines, l)
 	}
 
-	// 4. API 翻译逻辑
-	hasOfficialTrans := false
+	lineHasOfficialTrans := false
 	for _, l := range lines {
 		if l.Trans != "" {
-			hasOfficialTrans = true
+			lineHasOfficialTrans = true
 			break
 		}
 	}
 
-	if enableTranslation && !hasOfficialTrans {
-		var textsToTranslate []string
+	if enableTranslation {
+		var fullLyricText strings.Builder
 		for _, l := range lines {
-			if strings.TrimSpace(l.Text) != "" {
-				textsToTranslate = append(textsToTranslate, l.Text)
-			}
+			fullLyricText.WriteString(l.Text)
 		}
 
-		if len(textsToTranslate) > 0 {
-			translationLock.Lock()
-			time.Sleep(200 * time.Millisecond)
+		fullTextStr := fullLyricText.String()
+		isTrad := isTraditionalChinese(fullTextStr)
 
-			transEngine, err := translator.New(core.Config)
-			if err == nil {
-				translatedTexts, err := transEngine.Translate(textsToTranslate, core.Config.TranslationLanguage)
+		if isTrad {
+			for i := range lines {
+				lines[i].Trans = ""
+			}
+			lineHasOfficialTrans = false
+		}
+
+		if !isTrad && !lineHasOfficialTrans {
+			var textsToTranslate []string
+			for _, l := range lines {
+				if strings.TrimSpace(l.Text) != "" {
+					textsToTranslate = append(textsToTranslate, l.Text)
+				}
+			}
+
+			if len(textsToTranslate) > 0 {
+				translationLock.Lock()
+				time.Sleep(200 * time.Millisecond)
+				transEngine, err := translator.New(core.Config)
 				if err == nil {
-					transIndex := 0
-					for i := range lines {
-						if strings.TrimSpace(lines[i].Text) != "" {
-							if transIndex < len(translatedTexts) {
-								lines[i].Trans = translatedTexts[transIndex]
-								transIndex++
+					translatedTexts, err := transEngine.Translate(textsToTranslate, core.Config.TranslationLanguage)
+					if err == nil {
+						transIndex := 0
+						for i := range lines {
+							if strings.TrimSpace(lines[i].Text) != "" {
+								if transIndex < len(translatedTexts) {
+									lines[i].Trans = translatedTexts[transIndex]
+									transIndex++
+								}
 							}
 						}
 					}
 				}
+				translationLock.Unlock()
 			}
-			translationLock.Unlock()
 		}
 	}
 
-	// 5. 输出
 	var lrcBuilder strings.Builder
 	for _, l := range lines {
 		lrcBuilder.WriteString(fmt.Sprintf("[%02d:%02d.%02d]%s\n", l.M, l.S, l.MS, l.Text))
@@ -382,7 +441,6 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 	return strings.TrimSpace(lrcBuilder.String()), nil
 }
 
-// conventSyllableTTMLToLRC (保持不变)
 func conventSyllableTTMLToLRC(ttml string, enableTranslation bool) (string, error) {
 	parsedTTML := etree.NewDocument()
 	err := parsedTTML.ReadFromString(ttml)
@@ -405,8 +463,7 @@ func conventSyllableTTMLToLRC(ttml string, enableTranslation bool) (string, erro
 		if err != nil {
 			return "", err
 		}
-		
-		// 同样应用时间标准化逻辑，防止逐字模式下也有奇怪时间戳
+
 		totalSeconds := h*3600 + m*60 + s
 		m = totalSeconds / 60
 		s = totalSeconds % 60
