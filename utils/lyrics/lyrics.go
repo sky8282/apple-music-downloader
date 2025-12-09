@@ -134,6 +134,16 @@ func containsCJK(s string) bool {
 	return false
 }
 
+func containsJapanese(s string) bool {
+	for _, r := range s {
+		if (r >= 0x3040 && r <= 0x309F) ||
+			(r >= 0x30A0 && r <= 0x30FF) {
+			return true
+		}
+	}
+	return false
+}
+
 func isTraditionalChinese(s string) bool {
 	for _, r := range s {
 		switch r {
@@ -206,10 +216,10 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 
 	if timingAttr != nil && timingAttr.Value == "Word" {
 		rawLrc, _ := conventSyllableTTMLToLRC(ttml, false)
-		if isTraditionalChinese(rawLrc) {
+		if !containsJapanese(rawLrc) && isTraditionalChinese(rawLrc) {
 			return rawLrc, nil
 		}
-		
+
 		if !enableTranslation {
 			return rawLrc, nil
 		}
@@ -234,7 +244,7 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 		}
 
 		fullText := strings.Join(lines, "")
-		if isTraditionalChinese(fullText) {
+		if !containsJapanese(fullText) && isTraditionalChinese(fullText) {
 			return strings.Join(lines, "\n"), nil
 		}
 
@@ -258,7 +268,7 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 			}
 			translationLock.Unlock()
 		}
-		
+
 		return strings.Join(lines, "\n"), nil
 	}
 
@@ -390,7 +400,8 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 		}
 
 		fullTextStr := fullLyricText.String()
-		isTrad := isTraditionalChinese(fullTextStr)
+		isJp := containsJapanese(fullTextStr)
+		isTrad := !isJp && isTraditionalChinese(fullTextStr)
 
 		if isTrad {
 			for i := range lines {
