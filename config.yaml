@@ -78,27 +78,31 @@ translation-language: "zh-Hans-CN"
 # 第三方目标语言: zh-Hans (简体), zh-Hant (繁体), en (英文)
 translation-language: "zh-Hans" 
 # --- 第三方翻译 api 选择 ---
-# "tencent" "deepl" "microsoft" "google"
+# "自建 libretranslate" "tencent" "deepl" "microsoft" "google"
 translator-provider: "tencent"
 
 # --- 第三方 api 详细配置 (仅需填写你选择的那一家) ---
-# 1. 腾讯云 (推荐国内使用, 500万字符/月免费)
+# 1. 自建 libretranslate 翻译服务器，无字符数量限制
+libre_translate:
+  url: ""       # 填入你搭建的 API 地址
+  api_key: ""   # 如果没设置key，留空；设置了就填这里
+# 2. 腾讯云 (推荐国内使用, 500万字符/月免费)
 tencent:
-  secret-id: ""    # 填写 SecretId
-  secret-key: ""       # 填写 SecretKey
-  region: "ap-shanghai"                                # api 服务器地区
+  secret-id: ""            # 填写 SecretId
+  secret-key: ""           # 填写 SecretKey
+  region: "ap-shanghai"    # api 服务器地区
 
-# 2. DeepL (50万字符/月免费)
+# 3. DeepL (50万字符/月免费)
 deepl:
   auth-key: ""     # 填写 AuthKey (免费版通常以:fx结尾)
   is-pro: false    # 是否为 Pro 版
 
-# 3. 微软 Azure (200万字符/月免费)
+# 4. 微软 Azure (200万字符/月免费)
 microsoft:
   key: ""
   region: "eastasia"
 
-# 4. 谷歌 (需魔法网络)
+# 5. 谷歌 (需魔法网络)
 google:
   api-key: ""
 # ----------------------------------------------------------------  
