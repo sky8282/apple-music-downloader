@@ -71,6 +71,12 @@ type ConfigSet struct {
     DeepL                   DeepLConfig     `yaml:"deepl"`
     Microsoft               MicrosoftConfig `yaml:"microsoft"`
     Google                  GoogleConfig    `yaml:"google"`
+    LibreTranslate          LibreTranslateConfig `json:"libre_translate" yaml:"libre_translate"`
+}
+
+type LibreTranslateConfig struct {
+    Url    string `json:"url" yaml:"url"`
+    ApiKey string `json:"api_key" yaml:"api_key"`
 }
 
 type Counter struct {
