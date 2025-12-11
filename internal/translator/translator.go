@@ -21,6 +21,12 @@ type Translator interface {
 
 func New(cfg structs.ConfigSet) (Translator, error) {
 	switch strings.ToLower(cfg.TranslatorProvider) {
+	case "libretranslate":
+		if cfg.LibreTranslate.Url == "" {
+			return nil, errors.New("libretranslate url is empty")
+		}
+		cfg.LibreTranslate.Url = strings.TrimRight(cfg.LibreTranslate.Url, "/")
+		return &LibreTranslateTranslator{Config: cfg.LibreTranslate}, nil
 	case "tencent":
 		if cfg.Tencent.SecretId == "" || cfg.Tencent.SecretKey == "" {
 			return nil, errors.New("tencent secret-id or secret-key is empty")
@@ -44,6 +50,85 @@ func New(cfg structs.ConfigSet) (Translator, error) {
 	default:
 		return nil, fmt.Errorf("unknown translator provider: %s", cfg.TranslatorProvider)
 	}
+}
+
+type LibreTranslateTranslator struct {
+	Config structs.LibreTranslateConfig
+}
+
+func (l *LibreTranslateTranslator) Translate(texts []string, targetLang string) ([]string, error) {
+	if strings.HasPrefix(strings.ToLower(targetLang), "zh") {
+		targetLang = "zh"
+	}
+
+	apiUrl := l.Config.Url + "/translate"
+	payload := map[string]interface{}{
+		"q":      texts,
+		"source": "auto",
+		"target": targetLang,
+		"format": "text",
+	}
+
+	if l.Config.ApiKey != "" {
+		payload["api_key"] = l.Config.ApiKey
+	}
+
+	jsonBody, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("libretranslate api error, status code: %d", resp.StatusCode)
+	}
+
+	var response struct {
+		TranslatedText interface{} `json:"translatedText"`
+		Error          string      `json:"error"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, err
+	}
+
+	if response.Error != "" {
+		return nil, errors.New(response.Error)
+	}
+
+	var result []string
+	if strs, ok := response.TranslatedText.([]interface{}); ok {
+		for _, s := range strs {
+			if str, ok := s.(string); ok {
+				result = append(result, str)
+			} else {
+				result = append(result, "")
+			}
+		}
+	} else if str, ok := response.TranslatedText.(string); ok {
+		result = append(result, str)
+	} else {
+		return nil, errors.New("invalid response format from libretranslate")
+	}
+
+	if len(result) != len(texts) {
+		return nil, fmt.Errorf("translation count mismatch: sent %d, got %d", len(texts), len(result))
+	}
+
+	return result, nil
 }
 
 type TencentTranslator struct {
