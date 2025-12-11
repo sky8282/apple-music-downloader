@@ -134,63 +134,6 @@ func containsCJK(s string) bool {
 	return false
 }
 
-func containsJapanese(s string) bool {
-	for _, r := range s {
-		if (r >= 0x3040 && r <= 0x309F) ||
-			(r >= 0x30A0 && r <= 0x30FF) {
-			return true
-		}
-	}
-	return false
-}
-
-func isTraditionalChinese(s string) bool {
-	for _, r := range s {
-		switch r {
-		case
-			'們', '麼', '這', '沒', '來', '個', '對', '爲', '為', '儘', '倆', '爾', '誰', '幾', '雖',
-			'讓', '與', '問', '應', '該', '實', '現', '謝', '聽', '說', '讀', '寫', '畫', '習', '覺', '學', '愛', '戀', '驚', '憂', '懷', '憶', '懼',
-			'種', '樣', '從', '後', '裡', '進', '過', '達', '還', '運', '邊', '遠', '處', '場', '確', '認', '識', '聲', '響', '樂', '氣', '電', '腦', '號', '圖', '區', '點',
-			'風', '雲', '霧', '塵', '葉', '樹', '蘭', '藝', '藥', '頭', '髮', '顏', '頸', '體', '齒', '魚', '鳥', '龍', '龜', '馬',
-			'門', '開', '關', '閒', '闊', '閱', '錢', '銀', '鐘', '鐵', '錯', '錄', '鏡', '貝', '貧', '貨', '購', '贈', '賭', '賢', '質', '賴', '車', '轉', '輪', '輕', '載', '專', '傳', '韋', '衛', '頁', '頂', '順', '須', '預', '頌',
-			'東', '華', '戰', '鬥', '農', '業', '權', '導', '媽', '嗎', '筆', '幣', '畢', '閉', '婦', '孫', '陣', '陳', '陰', '陽', '際', '陸', '隊', '階', '隨', '險', '隱', '雜', '難', '劇', '勵', '歡', '歐', '毆', '嚴', '歸', '當',
-			'傷', '淚', '涙', '淒', '慘', '慾', '懸', '夢', '憤', '願',
-			'擁', '揮', '揚', '擺', '牽', '撐', '擱', '擊', '盪', '揹', '捨', '採', '掙', '掃', '擋', '擾', '揀',
-			'燈', '燒', '燦', '煙', '熾', '熱', '爍', '燼', '煉', '煩',
-			'島', '嶼', '嵐', '崗', '崖', '嶄', '嶺', '巔', '崑', '嶸', '巖', '壑',
-			'詩', '詞', '話', '語', '談', '誤', '課', '調', '諾', '詢', '諦', '譜', '譯', '證', '誌',
-			'歲', '舊', '曉', '曖', '曠', '晝', '曆', '昇',
-			'彌', '遙', '遲', '邁', '遵', '違', '鄉', '鄭',
-			'飄', '燭', '閃', '艷',
-			'牆', '樓', '樑', '櫻', '櫥', '櫃', '樺', '榮', '構', '橋', '檔', '欄',
-			'鋼', '錦', '鎖', '鎮', '鏽', '鑽', '鑄', '鑑', '錘', '鈴', '鋒', '鐺', '鍊', '鍛', '鍵',
-			'惱', '惋', '惻',
-			'靈', '霽', '颶', '颱', '飆',
-			'歎', '歛',
-			'輩', '辦', '邏', '輿', '輯', '輸', '軍', '郵',
-			'製', '縱', '績', '繼', '續', '緣', '線', '繞', '編', '緩', '縮', '綻', '紛',
-			'恒', '慟', '慣', '悶',
-			'靜', '寧',
-			'廣', '廳', '庫', '廢',
-			'飛', '鳳', '鳴', '鷹', '鷺', '鷗', '鴉',
-			'鯨', '鰻', '鮮', '鱗', '鱷',
-			'獸',
-			'戲', '槍', '劍', '劃', '勳',
-			'僕', '賞', '賠', '賤', '賬', '贖', '販', '貢', '財', '貴',
-			'隴',
-			'鬧', '鬱', '鬆', '鬨', '鬢', '鬍',
-			'綺', '絕', '純', '紗', '給', '統', '繪', '緒', '練', '繫', '網',
-			'驕', '駕', '駛', '騎', '驟', '駿', '騰', '驥',
-			'驅', '騙', '驛', '騷',
-			'鴿', '鴻', '鵬', '鶴',
-			'鯊', '鮭',
-			'啟', '嘆', '嚮', '嚇', '囂', '囈', '囀', '嚨':
-			return true
-		}
-	}
-	return false
-}
-
 func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 	parsedTTML := etree.NewDocument()
 	err := parsedTTML.ReadFromString(ttml)
@@ -198,78 +141,67 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 		return "", err
 	}
 
-	var iTunesMetadata *etree.Element
-	if head := parsedTTML.FindElement("tt").FindElement("head"); head != nil {
-		if meta := head.FindElement("metadata"); meta != nil {
-			iTunesMetadata = meta.FindElement("iTunesMetadata")
-		}
-	}
-
-	hasOfficialTrans := false
-	if iTunesMetadata != nil {
-		if len(iTunesMetadata.FindElements("translations")) > 0 {
-			hasOfficialTrans = true
-		}
-	}
-
 	timingAttr := parsedTTML.FindElement("tt").SelectAttr("itunes:timing")
-
 	if timingAttr != nil && timingAttr.Value == "Word" {
-		rawLrc, _ := conventSyllableTTMLToLRC(ttml, false)
-		if !containsJapanese(rawLrc) && isTraditionalChinese(rawLrc) {
-			return rawLrc, nil
+		hasOfficialTrans := false
+		if head := parsedTTML.FindElement("tt").FindElement("head"); head != nil {
+			if meta := head.FindElement("metadata"); meta != nil {
+				if iTunesMetadata := meta.FindElement("iTunesMetadata"); iTunesMetadata != nil {
+					if len(iTunesMetadata.FindElements("translations")) > 0 {
+						hasOfficialTrans = true
+					}
+				}
+			}
 		}
 
-		if !enableTranslation {
-			return rawLrc, nil
-		}
-
-		if hasOfficialTrans {
-			lrcWithTrans, err := conventSyllableTTMLToLRC(ttml, true)
+		if hasOfficialTrans || !enableTranslation {
+			lrc, err := conventSyllableTTMLToLRC(ttml, enableTranslation)
 			if err == nil {
-				if containsCJK(lrcWithTrans) {
-					return lrcWithTrans, nil
+				if !enableTranslation {
+					return lrc, nil
+				}
+				if containsCJK(lrc) {
+					return lrc, nil
 				}
 			}
 		}
 	}
 
 	if timingAttr != nil && timingAttr.Value == "None" {
-		var lines []string
+		var finalOutput []string
+		var rawLines []string
 		for _, p := range parsedTTML.FindElements("//p") {
 			text := strings.TrimSpace(p.Text())
 			if text != "" {
-				lines = append(lines, text)
+				rawLines = append(rawLines, text)
 			}
 		}
 
-		fullText := strings.Join(lines, "")
-		if !containsJapanese(fullText) && isTraditionalChinese(fullText) {
-			return strings.Join(lines, "\n"), nil
-		}
-
-		if enableTranslation {
+		if enableTranslation && len(rawLines) > 0 {
 			translationLock.Lock()
-			time.Sleep(200 * time.Millisecond)
 			transEngine, err := translator.New(core.Config)
 			if err == nil {
-				translatedTexts, err := transEngine.Translate(lines, core.Config.TranslationLanguage)
-				if err == nil && len(translatedTexts) == len(lines) {
-					var resultLines []string
-					for i, line := range lines {
-						resultLines = append(resultLines, line)
+				fmt.Printf(" [纯文本歌词] 正在翻译 %d 行...\n", len(rawLines))
+				translatedTexts, err := transEngine.Translate(rawLines, core.Config.TranslationLanguage)
+				if err == nil && len(translatedTexts) == len(rawLines) {
+					for i, line := range rawLines {
+						finalOutput = append(finalOutput, line)
 						if translatedTexts[i] != "" {
-							resultLines = append(resultLines, translatedTexts[i])
+							finalOutput = append(finalOutput, translatedTexts[i])
 						}
 					}
 					translationLock.Unlock()
-					return strings.Join(resultLines, "\n"), nil
+					return strings.Join(finalOutput, "\n"), nil
+				} else {
+					if err != nil {
+						fmt.Printf(" [纯文本翻译失败] %v\n", err)
+					}
 				}
 			}
 			translationLock.Unlock()
 		}
 
-		return strings.Join(lines, "\n"), nil
+		return strings.Join(rawLines, "\n"), nil
 	}
 
 	type LyricLine struct {
@@ -284,6 +216,13 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 		return "", errors.New("invalid ttml: no body")
 	}
 
+	var iTunesMetadata *etree.Element
+	if head := parsedTTML.FindElement("tt").FindElement("head"); head != nil {
+		if meta := head.FindElement("metadata"); meta != nil {
+			iTunesMetadata = meta.FindElement("iTunesMetadata")
+		}
+	}
+
 	var elements []*etree.Element
 	var collectElements func(e *etree.Element)
 	collectElements = func(e *etree.Element) {
@@ -294,6 +233,7 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 				break
 			}
 		}
+
 		if isContainer {
 			for _, child := range e.ChildElements() {
 				collectElements(child)
@@ -304,6 +244,7 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 			}
 		}
 	}
+
 	for _, child := range body.ChildElements() {
 		collectElements(child)
 	}
@@ -320,18 +261,23 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 			_, err = fmt.Sscanf(timeValue, "%d.%d", &s, &ms)
 			h, m = 0, 0
 		}
+		
 		if err != nil {
 			return 0, 0, 0, err
 		}
+
 		totalSeconds := h*3600 + m*60 + s
+		
 		finalM := totalSeconds / 60
 		finalS := totalSeconds % 60
 		finalMS := ms / 10
+
 		return finalM, finalS, finalMS, nil
 	}
 
 	for _, el := range elements {
 		beginValue := el.SelectAttr("begin").Value
+		
 		var l LyricLine
 		var err error
 		l.M, l.S, l.MS, err = parseTime(beginValue)
@@ -349,10 +295,12 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 					if strings.TrimSpace(cd.Data) != "" || childIndex > 0 {
 					}
 				}
+				
 				if childElem, ok := childToken.(*etree.Element); ok {
 					if childIndex > 0 {
 						textBuilder.WriteString(" ")
 					}
+					
 					var extractedText string
 					if attr := childElem.SelectAttr("text"); attr != nil {
 						extractedText = attr.Value
@@ -367,6 +315,7 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 				textBuilder.WriteString(el.Text())
 			}
 		}
+		
 		l.Text = textBuilder.String()
 
 		if enableTranslation && iTunesMetadata != nil {
@@ -385,59 +334,42 @@ func TtmlToLrc(ttml string, enableTranslation bool) (string, error) {
 		lines = append(lines, l)
 	}
 
-	lineHasOfficialTrans := false
+	hasOfficialTrans := false
 	for _, l := range lines {
 		if l.Trans != "" {
-			lineHasOfficialTrans = true
+			hasOfficialTrans = true
 			break
 		}
 	}
 
-	if enableTranslation {
-		var fullLyricText strings.Builder
+	if enableTranslation && !hasOfficialTrans {
+		var textsToTranslate []string
 		for _, l := range lines {
-			fullLyricText.WriteString(l.Text)
+			if strings.TrimSpace(l.Text) != "" {
+				textsToTranslate = append(textsToTranslate, l.Text)
+			}
 		}
 
-		fullTextStr := fullLyricText.String()
-		isJp := containsJapanese(fullTextStr)
-		isTrad := !isJp && isTraditionalChinese(fullTextStr)
+		if len(textsToTranslate) > 0 {
+			translationLock.Lock()
+			time.Sleep(200 * time.Millisecond)
 
-		if isTrad {
-			for i := range lines {
-				lines[i].Trans = ""
-			}
-			lineHasOfficialTrans = false
-		}
-
-		if !isTrad && !lineHasOfficialTrans {
-			var textsToTranslate []string
-			for _, l := range lines {
-				if strings.TrimSpace(l.Text) != "" {
-					textsToTranslate = append(textsToTranslate, l.Text)
-				}
-			}
-
-			if len(textsToTranslate) > 0 {
-				translationLock.Lock()
-				time.Sleep(200 * time.Millisecond)
-				transEngine, err := translator.New(core.Config)
+			transEngine, err := translator.New(core.Config)
+			if err == nil {
+				translatedTexts, err := transEngine.Translate(textsToTranslate, core.Config.TranslationLanguage)
 				if err == nil {
-					translatedTexts, err := transEngine.Translate(textsToTranslate, core.Config.TranslationLanguage)
-					if err == nil {
-						transIndex := 0
-						for i := range lines {
-							if strings.TrimSpace(lines[i].Text) != "" {
-								if transIndex < len(translatedTexts) {
-									lines[i].Trans = translatedTexts[transIndex]
-									transIndex++
-								}
+					transIndex := 0
+					for i := range lines {
+						if strings.TrimSpace(lines[i].Text) != "" {
+							if transIndex < len(translatedTexts) {
+								lines[i].Trans = translatedTexts[transIndex]
+								transIndex++
 							}
 						}
 					}
 				}
-				translationLock.Unlock()
 			}
+			translationLock.Unlock()
 		}
 	}
 
@@ -474,7 +406,7 @@ func conventSyllableTTMLToLRC(ttml string, enableTranslation bool) (string, erro
 		if err != nil {
 			return "", err
 		}
-
+		
 		totalSeconds := h*3600 + m*60 + s
 		m = totalSeconds / 60
 		s = totalSeconds % 60
