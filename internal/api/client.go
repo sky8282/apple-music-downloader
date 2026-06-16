@@ -352,7 +352,7 @@ func GetMVInfoFromAdam(adamId string, account *structs.Account, storefront strin
 }
 
 func GetToken() (string, error) {
-	req, err := http.NewRequest("GET", "https://beta.music.apple.com", nil)
+	req, err := http.NewRequest("GET", "https://music.apple.com", nil)
 	if err != nil {
 		return "", err
 	}
@@ -365,12 +365,12 @@ func GetToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	regex := regexp.MustCompile(`/assets/index-legacy[-~][^/]+\.js`)
+	regex := regexp.MustCompile(`/assets/index~[^/]+\.js`)
 	indexJsUri := regex.FindString(string(body))
 	if indexJsUri == "" {
 		return "", errors.New("could not find JS asset URL in HTML")
 	}
-	req, err = http.NewRequest("GET", "https://beta.music.apple.com"+indexJsUri, nil)
+	req, err = http.NewRequest("GET", "https://music.apple.com"+indexJsUri, nil)
 	if err != nil {
 		return "", err
 	}
@@ -383,7 +383,7 @@ func GetToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	regex = regexp.MustCompile(`eyJh([^"]*)`)
+	regex = regexp.MustCompile(`eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+`)
 	token := regex.FindString(string(body))
 	if token == "" {
 		return "", errors.New("could not find developer token in JS file")
