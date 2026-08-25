@@ -665,8 +665,11 @@ function processQueue() {
             ...process.env, 
             'PATH': [
                 goBinDir, 
+                appCwd,
+                '/opt/homebrew/bin',
+                '/usr/local/bin',
                 process.env.PATH
-            ].join(process.platform === 'win32' ? ';' : ':')
+            ].filter(Boolean).join(process.platform === 'win32' ? ';' : ':')
         };
         
         goProcess = spawn(binaryPath, goArgs, { 
