@@ -76,7 +76,7 @@ func InitFlags() {
 	Aac_type = pflag.String("aac-type", "aac", "Select AAC type, aac aac-binaural aac-downmix")
 	Mv_audio_type = pflag.String("mv-audio-type", "atmos", "Select MV audio type, atmos ac3 aac")
 	Mv_max = pflag.Int("mv-max", 1080, "Specify the max quality for download MV")
-	}
+}
 	
 
 
