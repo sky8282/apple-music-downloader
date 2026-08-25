@@ -6,17 +6,16 @@
 accounts:
   - name: "CN"           # 账号名称，方便识别
     storefront: "cn"     # 账号所属区域 (必须小写, 如 cn, us, jp, hk)
-    media-user-token: "your-media-user-token"
-    # authorization-token: "your-cn-auth-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
-    decrypt-m3u8-port: "192.168.1.132:8888" # 此账号对应的解密服务端口
-    get-m3u8-port: "192.168.1.132:8889"     # 此账号对应的M3U8获取服务端口
-# ----------------------------------------------------------------
-  - name: "JP"           # 账号名称，方便识别
-    storefront: "jp"     # 账号所属区域 (必须小写, 如 cn, us, jp, hk)
-    media-user-token: "your-media-user-token"
-    # authorization-token: "your-cn-auth-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
-    decrypt-m3u8-port: "192.168.1.132:9998" # 此账号对应的解密服务端口
-    get-m3u8-port: "192.168.1.132:9999"     # 此账号对应的M3U8获取服务端口
+    media-user-token: "your-cn-auth-token"
+    
+    authorization-token: "your-cn-auth-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
+    
+    decrypt-m3u8-port: "127.0.0.1:10020"
+    get-m3u8-port: "127.0.0.1:10021"
+    get-account-port: "127.0.0.1:10023"
+    key-server: "127.0.0.1:10024"
+    # 开启或关闭外部解密
+    template-decrypt: true
 # ----------------------------------------------------------------
 # - name: "US"
 #   storefront: "us"
@@ -24,6 +23,9 @@ accounts:
 #   authorization-token: "your-us-auth-token"
 #   decrypt-m3u8-port: "127.0.0.1:20020"
 #   get-m3u8-port: "127.0.0.1:20021"
+#   get-account-port: "127.0.0.1:20022"
+#   key-server: "127.0.0.1:20023"
+#   template-decrypt: true
 # ----------------------------------------------------------------
 # - name: "JP"
 #   storefront: "jp"
@@ -31,6 +33,9 @@ accounts:
 #   authorization-token: "your-us-auth-token"
 #   decrypt-m3u8-port: "127.0.0.1:30020"
 #   get-m3u8-port: "127.0.0.1:30021"
+#   get-account-port: "127.0.0.1:30022"
+#   key-server: "127.0.0.1:30023"
+#   template-decrypt: true
 # ----------------------------------------------------------------
 # 是否开启全区域解密
 # true: 使用所有配置的账号（CN, JP, US ...）解密
@@ -49,7 +54,7 @@ enable-cdn-override: true
 # 香港 17.253.85.201，17.253.85.202，17.253.85.203，17.253.85.204，17.253.85.205，17.253.85.206，17.253.87.195，17.253.87.196，17.253.87.201，17.253.87.203
 # 日本 17.253.69.200，17.253.69.202，17.253.75.201，17.253.75.202
 # 格式1：ip 为音视频通用，格式2：ip,ip 前面的为音频 CDN 逗号后面为视频 CDN，如：cdn-ip: "17.253.117.201,17.253.85.201"
-cdn-ip: "17.253.117.202"
+cdn-ip: "17.253.85.203"
 # ----------------------------------------------------------------
 # Qobuz 账号配置 (用于获取PDF和专辑介绍)，尽量使用 fr 法区
 qobuz-username: "" # 你的 Qobuz 邮箱
@@ -58,12 +63,12 @@ qobuz-password: "" # 你的 Qobuz 密码
 # 语言代码, 例如 "zh-CN", "en-GB"，"en-US" 留空则自动检测
 # 各区域支持的语言列表: https://gist.github.com/itouakirai/c8ba9df9dc65bd300094103b058731d0
 # 尽量使用英文"en-GB" "en-US" 歌手 - 专辑名 去匹配 Qobuz
-language: "en-GB" 
+language: "en-US" 
 # ---------------------------------------------------------------- 
 # 歌词设置
 # 自动识别链接的区域并使用此区域的账号获取歌词
 # 当发起任务的链接区域不在账号列表时,可选账号列表下的区域为默认下载歌词区域
-default-lyric-storefront: "cn"
+default-lyric-storefront: "us"
 # ---------------------------------------------------------------- 
 lrc-type: "syllable-lyrics"    # 可选: "lyrics" (普通歌词) 或 "syllable-lyrics" (逐字歌词与翻译)
 lrc-format: "lrc"     # 可选: "lrc" 或 "ttml"
@@ -71,53 +76,53 @@ embed-lrc: true       # 是否将歌词嵌入音频文件
 save-lrc-file: false  # 是否将歌词另存为 .lrc 文件
 # ---------------------------------------------------------------- 
 # 是否开启歌词翻译
-enable-translation: true
+enable-translation: false
 # 官方目标语言: zh-Hans-CN (简体), zh-Hant-TW (繁体), ja (日文), ko (韩文)
 translation-language: "zh-Hans-CN"
 # ----------------------------------------------------------------
 # 第三方目标语言: zh-Hans (简体), zh-Hant (繁体), en (英文)
 translation-language: "zh-Hans" 
 # --- 第三方翻译 api 选择 ---
-# "自建 libretranslate" "tencent" "deepl" "microsoft" "google"
+# "tencent" "deepl" "microsoft" "google"
 translator-provider: "tencent"
 
 # --- 第三方 api 详细配置 (仅需填写你选择的那一家) ---
-# 1. 自建 libretranslate 翻译服务器，无字符数量限制
-libre_translate:
-  url: ""       # 填入你搭建的 API 地址
-  api_key: ""   # 如果没设置key，留空；设置了就填这里
-# 2. 腾讯云 (推荐国内使用, 500万字符/月免费)
+# 1. 腾讯云 (推荐国内使用, 500万字符/月免费)
 tencent:
-  secret-id: ""            # 填写 SecretId
-  secret-key: ""           # 填写 SecretKey
-  region: "ap-shanghai"    # api 服务器地区
+  secret-id: ""    # 填写 SecretId
+  secret-key: ""       # 填写 SecretKey
+  region: "ap-shanghai"                                # api 服务器地区
 
-# 3. DeepL (50万字符/月免费)
+# 2. DeepL (50万字符/月免费)
 deepl:
   auth-key: ""     # 填写 AuthKey (免费版通常以:fx结尾)
   is-pro: false    # 是否为 Pro 版
 
-# 4. 微软 Azure (200万字符/月免费)
+# 3. 微软 Azure (200万字符/月免费)
 microsoft:
   key: ""
   region: "eastasia"
 
-# 5. 谷歌 (需魔法网络)
+# 4. 谷歌 (需魔法网络)
 google:
   api-key: ""
 # ----------------------------------------------------------------  
 #################################
 #经常下载失败请按自身网络环境调整参数 #
 # m3u8切片数量。                  #
-chunk_downloadthreads: 10       #
+chunk_downloadthreads: 15       #
+# 并发解密任务数                  #
+decrypt_threads: 10             #
+# 解密是否排队（建议大文件开启）     #
+enable_queue_decrypt: false     #
 # 网络块大小                      #
 NetworkReadBufferKB: 4096 # kb  #
 # I/O缓冲，过大将导致内存占用过高    #
 BufferSizeKB: 4 # kb            #
 # 下载线程数，最低为 1             #
-aac_downloadthreads: 5          #
-lossless_downloadthreads: 5     #
-hires_downloadthreads: 5        #
+aac_downloadthreads: 8          #
+lossless_downloadthreads: 8     #
+hires_downloadthreads: 8        #
 #################################
 # ---------------------------------------------------------------- 
 # go run main.go 直接回车执行txt模式
