@@ -10,6 +10,9 @@ type Account struct {
 	AuthorizationToken string `yaml:"authorization-token"`
 	DecryptM3u8Port    string `yaml:"decrypt-m3u8-port"`
 	GetM3u8Port        string `yaml:"get-m3u8-port"`
+	GetAccountPort     string `yaml:"get-account-port"`
+    KeyServer          string `yaml:"key-server"`
+    TemplateDecrypt    bool   `yaml:"template-decrypt"`
 }
 
 type ConfigSet struct {
