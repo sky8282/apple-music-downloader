@@ -37,6 +37,7 @@ var (
 	SharedLock     sync.Mutex
 	DeveloperToken string
 	MaxPathLength  int
+	KeyServer      string
 )
 
 type TrackStatus struct {
@@ -75,7 +76,9 @@ func InitFlags() {
 	Aac_type = pflag.String("aac-type", "aac", "Select AAC type, aac aac-binaural aac-downmix")
 	Mv_audio_type = pflag.String("mv-audio-type", "atmos", "Select MV audio type, atmos ac3 aac")
 	Mv_max = pflag.Int("mv-max", 1080, "Specify the max quality for download MV")
-}
+	}
+	
+
 
 func LoadConfig(configPath string) error {
 	if configPath == "" {
@@ -116,6 +119,36 @@ func LoadConfig(configPath string) error {
 	}
 
 	fmt.Printf("%s : %s\n", green("全区域账号解密"), red(Config.GlobalDecryption))
+
+    var currentAccount *structs.Account
+
+    for _, arg := range os.Args {
+        if strings.Contains(arg, "music.apple.com") {
+            re := regexp.MustCompile(`music\.apple\.com/([^/]+)/`)
+            matches := re.FindStringSubmatch(arg)
+
+            if len(matches) > 1 {
+                currentAccount, _ = GetAccountForStorefront(matches[1])
+            }
+            break
+        }
+    }
+
+    if currentAccount != nil && currentAccount.TemplateDecrypt {
+        fmt.Printf(
+            "%s : %s\n",
+            green("外部下发密钥"),
+            //red("开启 (KeyServer: "+currentAccount.KeyServer+")"),
+            red("true"),
+        )
+    } else if currentAccount != nil {
+        fmt.Printf(
+            "%s : %s\n",
+            green("外部解密(Wrapper)"),
+            red("关闭 (使用本地解密)"),
+        )
+    }
+
 	useAutoDetect := true
 	if Config.MaxPathLength > 0 {
 		MaxPathLength = Config.MaxPathLength
