@@ -20,13 +20,6 @@ import (
 	"github.com/grafov/m3u8"
 	"github.com/itouakirai/mp4ff/mp4"
 )
-
-var (
-	globalDecryptMu sync.Mutex
-	activeDecrypts  int
-	decryptCond     = sync.NewCond(&globalDecryptMu)
-)
-
 const prefetchKey = "skd://itunes.apple.com/P000000000/s1/e1"
 var ErrTimeout = errors.New("response timed out")
 
@@ -36,7 +29,6 @@ type TimedResponseBody struct {
 	threshold int
 	body      io.Reader
 }
-
 type decryptJob struct {
 	Seq       int
 	Frag      *mp4.Fragment
@@ -49,6 +41,7 @@ type decryptResult struct {
 	Frag      *mp4.Fragment
 	RawOffset int64
 }
+
 
 type progressWriter struct {
 	total      int64
@@ -63,27 +56,14 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 	n := len(p)
 	pw.current += int64(n)
 	now := time.Now()
-	if now.Sub(pw.lastReport) >= 100*time.Millisecond || pw.current >= pw.total {
-		speed := 0.0
-		if elapsed := now.Sub(pw.lastReport).Seconds(); elapsed > 0 {
-			speed = float64(pw.current-pw.lastBytes) / elapsed
-		}
+	if now.Sub(pw.lastReport) >= 100*time.Millisecond || pw.current == pw.total {
+		speed := float64(pw.current-pw.lastBytes) / now.Sub(pw.lastReport).Seconds()
 		pct := int(float64(pw.current) * 100 / float64(pw.total))
 		if pct > 100 {
 			pct = 100
 		}
 		if pw.ch != nil {
-			if pct >= 100 {
-				select {
-				case pw.ch <- runv14.ProgressUpdate{Percentage: pct, SpeedBPS: speed, Stage: pw.stage}:
-				case <-time.After(1 * time.Second):
-				}
-			} else {
-				select {
-				case pw.ch <- runv14.ProgressUpdate{Percentage: pct, SpeedBPS: speed, Stage: pw.stage}:
-				default:
-				}
-			}
+			pw.ch <- runv14.ProgressUpdate{Percentage: pct, SpeedBPS: speed, Stage: pw.stage}
 		}
 		pw.lastReport = now
 		pw.lastBytes = pw.current
@@ -91,55 +71,35 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 	return n, nil
 }
 
+
 func (b *TimedResponseBody) Read(p []byte) (int, error) {
 	n, err := b.body.Read(p)
 	if err != nil {
 		return n, err
 	}
+	// fmt.Printf("Read %d bytes, buffer size %d bytes", n, len(p))
 	if n >= b.threshold {
 		b.timer.Reset(b.timeout)
 	}
 	return n, err
 }
-
 const (
-	downloadMaxAttempts = 5                 
-	downloadIdleTimeout = 30 * time.Second  
+	downloadMaxAttempts = 5                 // 最多尝试次数
+	downloadIdleTimeout = 30 * time.Second  // 30 秒没收到任何字节就认为卡死
 )
 
 func downloadWithResume(ctx context.Context, client *http.Client, fileUrl string,
-	header http.Header, totalLen int64, progressChan chan runv14.ProgressUpdate, tempFilePath string) error {
+	header http.Header, totalLen int64, progressChan chan runv14.ProgressUpdate) (*bytes.Buffer, error) {
 
-	file, err := os.OpenFile(tempFilePath, os.O_CREATE|os.O_RDWR, 0666)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	stat, err := file.Stat()
-	if err != nil {
-		return err
-	}
-	var offset int64 = stat.Size()
-
-	if offset > totalLen {
-		file.Truncate(0)
-		offset = 0
-	} else if offset > 0 {
-		file.Seek(offset, io.SeekStart)
-	}
-
-	if offset == totalLen {
-		return nil
-	}
-
+	buf := &bytes.Buffer{}
+	var offset int64
 	backoff := 2 * time.Second
 
 	for attempt := 1; attempt <= downloadMaxAttempts; attempt++ {
 		if attempt > 1 {
 			select {
 			case <-ctx.Done():
-				return ctx.Err()
+				return nil, ctx.Err()
 			case <-time.After(backoff):
 			}
 			if backoff < 30*time.Second {
@@ -151,7 +111,7 @@ func downloadWithResume(ctx context.Context, client *http.Client, fileUrl string
 		req, err := http.NewRequestWithContext(attemptCtx, "GET", fileUrl, nil)
 		if err != nil {
 			attemptCancel()
-			return err
+			return nil, err
 		}
 		req.Header = header
 		if offset > 0 {
@@ -166,12 +126,12 @@ func downloadWithResume(ctx context.Context, client *http.Client, fileUrl string
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 			resp.Body.Close()
 			attemptCancel()
-			return fmt.Errorf("download failed: server returned %s", resp.Status)
+			return nil, fmt.Errorf("download failed: server returned %s", resp.Status)
 		}
 		if offset > 0 && resp.StatusCode != http.StatusPartialContent {
 			resp.Body.Close()
 			attemptCancel()
-			return errors.New("server does not support Range requests, cannot resume")
+			return nil, errors.New("server does not support Range requests, cannot resume")
 		}
 
 		timer := time.AfterFunc(downloadIdleTimeout, attemptCancel)
@@ -191,36 +151,29 @@ func downloadWithResume(ctx context.Context, client *http.Client, fileUrl string
 			lastBytes:  offset,
 		}
 
-		n, copyErr := io.Copy(io.MultiWriter(file, pw), body)
+		n, copyErr := io.Copy(io.MultiWriter(buf, pw), body)
 		resp.Body.Close()
 		timer.Stop()
 		attemptCancel()
 		offset += n
 
 		if copyErr == nil && offset == totalLen {
-			if progressChan != nil {
-				select {
-				case progressChan <- runv14.ProgressUpdate{Percentage: 100, SpeedBPS: 0, Stage: "download"}:
-				case <-time.After(1 * time.Second):
-				}
-			}
-			return nil
+			return buf, nil
 		}
-		
 		if copyErr == nil {
 			copyErr = fmt.Errorf("short download: got %d of %d bytes", offset, totalLen)
 		}
 	}
-	return fmt.Errorf("download failed after %d attempts (got %d/%d bytes)",
+	return nil, fmt.Errorf("download failed after %d attempts (got %d/%d bytes)",
 		downloadMaxAttempts, offset, totalLen)
 }
 
 func Run(adamId string, playlistUrl string, outfile string, account *structs.Account, Config structs.ConfigSet, progressChan chan runv14.ProgressUpdate) error {
-	var err error
-	var optstimeout uint
-	optstimeout = 0
-	timeout := time.Duration(optstimeout * uint(time.Millisecond))
-	header := make(http.Header)
+	    var err error
+	    var optstimeout uint
+	    optstimeout = 0
+	    timeout := time.Duration(optstimeout * uint(time.Millisecond))
+	    header := make(http.Header)
 
 	req, err := http.NewRequest("GET", playlistUrl, nil)
 	if err != nil {
@@ -261,40 +214,44 @@ func Run(adamId string, playlistUrl string, outfile string, account *structs.Acc
 	}
 	req.Header = header
 
-	http.DefaultClient.Timeout = 15 * time.Second
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy:                 http.ProxyFromEnvironment,
-			TLSHandshakeTimeout:   15 * time.Second,
-			ResponseHeaderTimeout: 15 * time.Second,
-			IdleConnTimeout:       90 * time.Second,
-		},
+	var body io.Reader
+	client := &http.Client{Timeout: timeout}
+	if optstimeout > 0 {
+		timer := time.AfterFunc(timeout, func() { cancel(ErrTimeout) })
+		do, err = client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer do.Body.Close()
+		body = &TimedResponseBody{
+			timeout:   timeout,
+			timer:     timer,
+			threshold: 256,
+			body:      do.Body,
+		}
+	} else {
+		do, err = client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer do.Body.Close()
+		if do.ContentLength < int64(Config.MaxMemoryLimit * 1024 * 1024) {
+			buffer, err := downloadWithResume(ctx, client, fileUrl.String(), header, do.ContentLength, progressChan)
+			if err != nil {
+				return err
+			}
+			
+			body = buffer
+		} else {
+			body = do.Body
+		}
 	}
-	
-	do, err = client.Do(req)
-	if err != nil {
-		return err
-	}
-	var totalLen int64 = do.ContentLength
-	do.Body.Close()
 
-	tempEncFile := outfile + ".enc"
-	err = downloadWithResume(ctx, client, fileUrl.String(), header, totalLen, progressChan, tempEncFile)
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tempEncFile)
-
-	encFile, err := os.Open(tempEncFile)
-	if err != nil {
-		return err
-	}
-	defer encFile.Close()
-
+	var totalLen int64
+	totalLen = do.ContentLength
 	keyServer := account.KeyServer
 
-	err = downloadAndDecryptFile(keyServer, encFile, outfile, adamId, segments, totalLen, Config, progressChan)
+	err = downloadAndDecryptFile(keyServer, body, outfile, adamId, segments, totalLen, Config, progressChan)
 	if err != nil {
 		return err
 	}
@@ -303,49 +260,20 @@ func Run(adamId string, playlistUrl string, outfile string, account *structs.Acc
 
 func downloadAndDecryptFile(keyServer string, in io.Reader, outfile string,
 	adamId string, playlistSegments []*m3u8.MediaSegment, totalLen int64, Config structs.ConfigSet, progressChan chan runv14.ProgressUpdate) error {
-	
-	globalDecryptMu.Lock()
-	limit := 1
-	if !Config.EnableQueueDecrypt {
-		limit = Config.DecryptThreads
-		if limit <= 0 {
-			limit = 10
+	var buffer bytes.Buffer
+	var outBuf *bufio.Writer
+	MaxMemorySize := int64(Config.MaxMemoryLimit * 1024 * 1024)
+	inBuf := bufio.NewReader(in)
+	if totalLen <= MaxMemorySize {
+		outBuf = bufio.NewWriter(&buffer)
+	} else {
+		ofh, err := os.Create(outfile)
+		if err != nil {
+			return err
 		}
+		defer ofh.Close()
+		outBuf = bufio.NewWriter(ofh)
 	}
-	
-	for activeDecrypts >= limit {
-		decryptCond.Wait()
-	}
-	activeDecrypts++
-	globalDecryptMu.Unlock()
-
-	defer func() {
-		globalDecryptMu.Lock()
-		activeDecrypts--
-		decryptCond.Broadcast()
-		globalDecryptMu.Unlock()
-	}()
-
-	ofh, err := os.Create(outfile)
-	if err != nil {
-		return err
-	}
-	defer ofh.Close()
-	
-	bufferSize := Config.BufferSizeKB * 1024
-	if bufferSize <= 0 {
-		bufferSize = 4096 * 1024 
-	}
-	outBuf := bufio.NewWriterSize(ofh, bufferSize)
-	inBuf := bufio.NewReaderSize(in, bufferSize)
-	
-	if progressChan != nil {
-		select {
-		case progressChan <- runv14.ProgressUpdate{Percentage: 0, SpeedBPS: 0, Stage: "decrypt"}:
-		case <-time.After(1 * time.Second):
-		}
-	}
-
 	init, offset, err := ReadInitSegment(inBuf)
 	if err != nil {
 		return err
@@ -367,9 +295,8 @@ func downloadAndDecryptFile(keyServer string, in io.Reader, outfile string,
 	}
 
 	var currentOffset int64 = int64(offset)
-	var lastBytes int64 = currentOffset
+	var lastBytes int64
 	lastReport := time.Now()
-
 	reportProgress := func(added int64) {
 		currentOffset += added
 		now := time.Now()
@@ -383,46 +310,18 @@ func downloadAndDecryptFile(keyServer string, in io.Reader, outfile string,
 				pct = 100
 			}
 			if progressChan != nil {
-				if pct >= 100 {
-					select {
-					case progressChan <- runv14.ProgressUpdate{Percentage: pct, SpeedBPS: speed, Stage: "decrypt"}:
-					case <-time.After(1 * time.Second):
-					}
-				} else {
-					select {
-					case progressChan <- runv14.ProgressUpdate{Percentage: pct, SpeedBPS: speed, Stage: "decrypt"}:
-					default:
-					}
-				}
+				progressChan <- runv14.ProgressUpdate{Percentage: pct, SpeedBPS: speed, Stage: "decrypt"}
 			}
 			lastReport = now
 			lastBytes = currentOffset
 		}
 	}
-	
 	reportProgress(0)
 
 	eg, ctx := errgroup.WithContext(context.Background())
 
-	workerCount := 10
-	if Config.DecryptThreads > 0 {
-		workerCount = Config.DecryptThreads
-	}
-
-	jobBufferSize := workerCount * 2
-	if jobBufferSize < 20 {
-		jobBufferSize = 20
-	}
-	
-	var inFlightSem chan struct{}
-	if Config.EnableQueueDecrypt {
-		inFlightSem = make(chan struct{}, jobBufferSize)
-	} else {
-		jobBufferSize = 10000 
-	}
-
-	jobs := make(chan *decryptJob, jobBufferSize)
-	results := make(chan *decryptResult, jobBufferSize)
+	jobs := make(chan *decryptJob, 10)
+	results := make(chan *decryptResult, 10)
 
 	eg.Go(func() error {
 		buffer := make(map[int]*decryptResult)
@@ -448,10 +347,6 @@ func downloadAndDecryptFile(keyServer string, in io.Reader, outfile string,
 						
 						delete(buffer, expectedSeq)
 						expectedSeq++
-						
-						if inFlightSem != nil {
-							<-inFlightSem
-						}
 					} else {
 						break
 					}
@@ -461,8 +356,7 @@ func downloadAndDecryptFile(keyServer string, in io.Reader, outfile string,
 	})
 
 	var workerWg sync.WaitGroup
-
-	for i := 0; i < workerCount; i++ {
+	for i := 0; i < 10; i++ {
 		workerWg.Add(1)
 		eg.Go(func() error {
 			defer workerWg.Done()
@@ -474,9 +368,7 @@ func downloadAndDecryptFile(keyServer string, in io.Reader, outfile string,
 					if !ok {
 						return nil
 					}
-					
-					err := DecryptFragment(job.Frag, tracks, job.Tmpl)
-					if err != nil {
+					if err := DecryptFragment(job.Frag, tracks, job.Tmpl); err != nil {
 						return fmt.Errorf("decryptFragment seq %d: %w", job.Seq, err)
 					}
 					
@@ -510,45 +402,31 @@ func downloadAndDecryptFile(keyServer string, in io.Reader, outfile string,
 				return ctx.Err()
 			}
 
-			if inFlightSem != nil {
-				select {
-				case inFlightSem <- struct{}{}:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-
 			var frag *mp4.Fragment
 			rawoffset := offset
 			frag, offset, err = ReadNextFragment(inBuf, offset)
 			rawoffset = offset - rawoffset
 			if err != nil {
-				if inFlightSem != nil {
-					<-inFlightSem
-				}
 				return fmt.Errorf("read fragment: %w", err)
 			}
 			if frag == nil {
-				if inFlightSem != nil {
-					<-inFlightSem 
-				}
-				break 
+				break
 			}
 
-			if i < len(playlistSegments) {
-				segment := playlistSegments[i]
-				if segment != nil && segment.Key != nil && i < 2 {
-					if segment.Key.URI == prefetchKey {
-						tmpl = prefetchTemplate()
-					} else {
-						tmpl, err = fetchTemplate(keyServer, adamId, segment.Key.URI)
-					}
-					if err != nil {
-						if inFlightSem != nil {
-							<-inFlightSem
-						}
-						return err
-					}
+			segment := playlistSegments[i]
+			if segment == nil {
+				return errors.New("segment number out of sync")
+			}
+			
+			key := segment.Key
+			if key != nil && (i < 2) {
+				if key.URI == prefetchKey {
+					tmpl = prefetchTemplate()
+				} else {
+					tmpl, err = fetchTemplate(keyServer, adamId, key.URI)
+				}
+				if err != nil {
+					return err
 				}
 			}
 
@@ -577,22 +455,20 @@ func downloadAndDecryptFile(keyServer string, in io.Reader, outfile string,
 	if err != nil {
 		return err
 	}
-	
-	if progressChan != nil {
-		select {
-		case progressChan <- runv14.ProgressUpdate{Percentage: 100, SpeedBPS: 0, Stage: "decrypt"}:
-		case <-time.After(1 * time.Second):
+	if totalLen <= MaxMemorySize {
+		ofh, err := os.Create(outfile)
+		if err != nil {
+			return err
+		}
+		defer ofh.Close()
+
+		_, err = ofh.Write(buffer.Bytes())
+		if err != nil {
+			return err
 		}
 	}
-	
 	return nil
 }
-
-
-
-
-
-
 
 func sanitizeInit(init *mp4.InitSegment) error {
 	traks := init.Moov.Traks
@@ -690,6 +566,7 @@ func ReadNextFragment(r io.Reader, offset uint64) (*mp4.Fragment, uint64, error)
 			return nil, offset, err
 		}
 		boxType := box.Type()
+		// fmt.Printf("processing %s, box starts @ offset %d\n", boxType, offset)
 		offset += box.Size()
 		if boxType == "moof" || boxType == "emsg" || boxType == "prft" {
 			frag.AddChild(box)
@@ -744,6 +621,7 @@ func TransformInit(init *mp4.InitSegment) (map[uint32]mp4.DecryptTrackInfo, erro
 	return tracks, nil
 }
 
+
 func cbcsDecryptRaw(data []byte, decryptBlockLen, skipBlockLen int, tmpl *template) error {
 	if skipBlockLen != 0 {
 		return fmt.Errorf("not full encryption of subsamples")
@@ -755,6 +633,7 @@ func cbcsDecryptRaw(data []byte, decryptBlockLen, skipBlockLen int, tmpl *templa
 }
 
 func cbcsDecryptSample(sample []byte, subSamplePatterns []mp4.SubSamplePattern, tenc *mp4.TencBox, tmpl *template) error {
+
 	decryptBlockLen := int(tenc.DefaultCryptByteBlock) * 16
 	skipBlockLen := int(tenc.DefaultSkipByteBlock) * 16
 	var pos uint32 = 0
