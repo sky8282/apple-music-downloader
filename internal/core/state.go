@@ -1,9 +1,11 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"main/utils/structs"
+	"net/http"
 	"os"
 	"regexp"
 	"runtime"
@@ -101,6 +103,27 @@ func LoadConfig(configPath string) error {
 
 	if len(Config.Accounts) == 0 {
 		return errors.New(red("配置错误: 'accounts' 列表为空，请在 config.yaml 中至少配置一个账户"))
+	}
+
+	if Config.GetAccountFromDevice {
+		for i := range Config.Accounts {
+			port := Config.Accounts[i].GetAccountPort
+			if port != "" {
+				resp, err := http.Get("http://" + port)
+				if err != nil {
+					fmt.Printf("获取账号 [%s] 信息失败: %v\n", Config.Accounts[i].Name, err)
+					continue
+				}
+				var data map[string]string
+				if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+					fmt.Printf("解析账号 [%s] 响应失败: %v\n", Config.Accounts[i].Name, err)
+				} else if data["music_token"] != "" {
+					Config.Accounts[i].MediaUserToken = data["music_token"]
+					fmt.Printf("成功自动获取账号 [%s] 的 media-user-token\n", Config.Accounts[i].Name)
+				}
+				resp.Body.Close()
+			}
+		}
 	}
 
 	if Config.TxtDownloadThreads <= 0 {
@@ -229,6 +252,13 @@ func LoadConfig(configPath string) error {
 		if showVideo && mvCdnIp != "" {
 			fmt.Printf("%s : %s\n", green("[Video_CDN 劫持] mvod.itunes.apple.com"), red(mvCdnIp))
 		}
+	}
+
+	if Config.AlacMax <= 0 {
+		Config.AlacMax = 192000
+	}
+	if Config.AtmosMax <= 0 {
+		Config.AtmosMax = 2768
 	}
 
 	if *Alac_max == 0 {
