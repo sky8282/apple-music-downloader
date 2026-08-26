@@ -13,7 +13,7 @@ accounts:
     get-m3u8-port: "127.0.0.1:10021"
     get-account-port: "127.0.0.1:10022"
     key-server: "127.0.0.1:10023"
-    # 建议 hires 获取 m3u8
+    # 建议 hires 才获取 m3u8
     get-m3u8-mode: hires
     # 开启外部解密
     template-decrypt: true
@@ -24,12 +24,12 @@ accounts:
 #  - name: "US"           # 账号名称，方便识别
 #    storefront: "us"     # 账号所属区域 (必须小写, 如 cn, us, jp, hk)
 #    media-user-token: "your-media-token"
-    # authorization-token: "your-authorization-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
+#    authorization-token: "your-authorization-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
 #    decrypt-m3u8-port: "127.0.0.1:20020"
 #    get-m3u8-port: "127.0.0.1:20021"
 #    get-account-port: "127.0.0.1:20022"
 #    key-server: "127.0.0.1:20023"
-#    # 建议 hires 获取 m3u8
+     # 建议 hires 获取 m3u8
 #    get-m3u8-mode: hires
     # 开启外部解密
 #    template-decrypt: true
