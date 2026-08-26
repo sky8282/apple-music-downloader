@@ -71,7 +71,7 @@ func stripAnsi(str string) string {
 	return re.ReplaceAllString(str, "")
 }
 
-func (pui *ProgressUI) AddTrack(trackIndex, totalTracks int, trackName, qualityStr string) {
+func (pui *ProgressUI) AddTrack(trackIndex, totalTracks int, trackName, qualityStr string, isCrippled bool) {
 	pui.mu.Lock()
 	defer pui.mu.Unlock()
 
@@ -84,7 +84,14 @@ func (pui *ProgressUI) AddTrack(trackIndex, totalTracks int, trackName, qualityS
 	}
 
 	shortName := truncateString(trackName, 25)
-	prefix := fmt.Sprintf("Track %02d/%02d: %s", trackIndex, totalTracks, shortName)
+	var prefix string
+	if isCrippled {
+		red := color.New(color.FgRed).SprintFunc()
+		trackStr := fmt.Sprintf("Track %02d/%02d", trackIndex, totalTracks)
+		prefix = fmt.Sprintf("%s: %s", red(trackStr), shortName)
+	} else {
+		prefix = fmt.Sprintf("Track %02d/%02d: %s", trackIndex, totalTracks, shortName)
+	}
 
 	bs := &barState{
 		trackName:  shortName,
@@ -201,7 +208,6 @@ func (pui *ProgressUI) UpdateProgress(trackIndex int, percentage int, speedBPS f
 		}
 		bs.speedStr = utils.FormatSpeed(speedBPS)
 		bs.statusMu.Unlock()
-
 		bs.bar.SetCurrent(int64(percentage))
 	}
 }
@@ -229,13 +235,6 @@ func (pui *ProgressUI) HandleProgress(trackIndex int, progressChan chan runv14.P
 			bs.account = accountName
 
 			if p.Stage == "decrypt" {
-				if !hasStartedDecrypting {
-					hasStartedDecrypting = true
-					bs.bar.SetTotal(100, false)
-					bs.bar.SetCurrent(0)
-				}
-				bs.bar.SetCurrent(int64(p.Percentage))
-				
 				if p.Percentage >= 100 {
 					bs.stateTxt = "元数据写入中"
 				} else if p.Percentage == 0 {
@@ -243,25 +242,32 @@ func (pui *ProgressUI) HandleProgress(trackIndex int, progressChan chan runv14.P
 				} else {
 					bs.stateTxt = "账号解密中"
 				}
-
 				bs.isDecrypt = true
 			} else {
-				hasStartedDecrypting = false
-				bs.bar.SetTotal(100, false)
-				bs.bar.SetCurrent(int64(p.Percentage))
 				bs.isDecrypt = false
-
 				if p.Percentage >= 100 {
 					bs.stateTxt = "账号等待解密中"
 				} else {
 					bs.stateTxt = "下载中"
 				}
 			}
-			bs.statusMu.Unlock()
+			bs.statusMu.Unlock() 
+
+			if p.Stage == "decrypt" {
+				if !hasStartedDecrypting {
+					hasStartedDecrypting = true
+					bs.bar.SetTotal(100, false)
+					bs.bar.SetCurrent(0)
+				}
+				bs.bar.SetCurrent(int64(p.Percentage))
+			} else {
+				hasStartedDecrypting = false
+				bs.bar.SetTotal(100, false)
+				bs.bar.SetCurrent(int64(p.Percentage))
+			}
 		}
 	}()
 }
-
 func (pui *ProgressUI) SetDone(trackIndex int, status string) {
 	pui.mu.Lock()
 	bs, ok := pui.bars[trackIndex]
@@ -277,7 +283,6 @@ func (pui *ProgressUI) SetDone(trackIndex int, status string) {
 		bs.isDone = true
 		bs.speedStr = ""
 		bs.statusMu.Unlock()
-
 		bs.bar.SetTotal(100, true)
 		bs.bar.SetCurrent(100)
 	}
@@ -298,7 +303,6 @@ func (pui *ProgressUI) Abort(trackIndex int, status string) {
 		bs.isDone = true
 		bs.speedStr = ""
 		bs.statusMu.Unlock()
-
 		bs.bar.SetTotal(100, true)
 	}
 }
