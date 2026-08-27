@@ -12,6 +12,16 @@
     
     const badgeStyle = document.createElement('style');
     badgeStyle.innerHTML = `
+        body {
+            padding-bottom: 45px !important;
+        }
+        
+        amp-chrome-player, 
+        amp-upsell, 
+        [class*="smart-banner"], 
+        [class*="bottom-banner"] {
+            bottom: 45px !important;
+        }
         .custom-button-container { display: inline-flex; align-items: center; gap: 10px; margin-left: 10px; vertical-align: middle; flex-shrink: 0; }
         .custom-dl-btn { border: none !important; border-radius: 50px !important; font-weight: bold !important; cursor: pointer !important; transition: transform 0.2s ease, background-color 0.2s ease !important; line-height: 1.2 !important; display: inline-flex !important; align-items: center; gap: 8px; z-index: 9999; white-space: nowrap; }
         .custom-dl-btn:hover { transform: scale(1.05); } 
@@ -473,21 +483,21 @@
     function injectNavControls() {
         if (document.getElementById('custom-nav-container')) return;
 
-        const searchWrapper = document.querySelector('[data-testid="search-input"]');
+        const logoElement = document.querySelector('[data-testid="logo"]');
+        if (!logoElement) return;
 
-        if (!searchWrapper) return; 
+        logoElement.style.display = 'flex';
+        logoElement.style.alignItems = 'center';
 
         const navContainer = document.createElement('div');
         navContainer.id = 'custom-nav-container';
         navContainer.style.cssText = `
-            display: flex;
-            width: 100%;
-            box-sizing: border-box;
+            display: inline-flex;
             align-items: center;
-            justify-content: flex-start;
             gap: 8px;
-            padding: 0 0 8px 20px;
+            margin-left: 16px; 
             -webkit-app-region: no-drag;
+            pointer-events: auto;
         `;
 
         const btnStyle = `
@@ -514,22 +524,30 @@
             btn.style.cssText = btnStyle;
             btn.onmouseenter = () => { btn.style.color = '#fff'; btn.style.backgroundColor = 'rgba(255,255,255,0.1)'; };
             btn.onmouseleave = () => { btn.style.color = '#aaa'; btn.style.backgroundColor = 'transparent'; };
-            btn.onclick = (e) => {
+            
+            const stopAllClicks = (e) => {
                 e.preventDefault();
-                onClick();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
             };
+            
+            btn.addEventListener('pointerdown', (e) => {
+                stopAllClicks(e);
+                onClick();
+            }, { capture: true });
+            
+            btn.addEventListener('pointerup', stopAllClicks, { capture: true });
+            btn.addEventListener('click', stopAllClicks, { capture: true });
+
             return btn;
         }
 
-        const btnBack = createNavBtn(iconBack, '后退', () => window.desktopApp.navigateBack());
-        const btnFwd = createNavBtn(iconFwd, '前进', () => window.desktopApp.navigateFwd());
-        const btnRefresh = createNavBtn(iconRefresh, '刷新', () => window.desktopApp.refreshPage());
-
-        navContainer.appendChild(btnBack);
-        navContainer.appendChild(btnFwd);
-        navContainer.appendChild(btnRefresh);
-        searchWrapper.parentElement.insertBefore(navContainer, searchWrapper);
+        navContainer.appendChild(createNavBtn(iconBack, '后退', () => window.desktopApp.navigateBack()));
+        navContainer.appendChild(createNavBtn(iconFwd, '前进', () => window.desktopApp.navigateFwd()));
+        navContainer.appendChild(createNavBtn(iconRefresh, '刷新', () => window.desktopApp.refreshPage()));
+        logoElement.appendChild(navContainer);
     }
+    
     setInterval(injectNavControls, 1000);
 
     console.log('Apple Music 助手已加载');
