@@ -121,6 +121,8 @@ func handleSingleMV(urlRaw string) {
 		core.SharedLock.Unlock()
 		if jsonOutput {
 			printJSONError(fmt.Sprintf("MV 下载失败: %v", err))
+		} else {
+			fmt.Printf("MV 下载失败: %v\n", err)
 		}
 		return
 	}
@@ -193,8 +195,12 @@ func processURL(urlRaw string, wg *sync.WaitGroup, semaphore chan struct{}, curr
 		core.Dl_song = true
 	}
 
+	var isStation bool
 	if strings.Contains(urlRaw, "/playlist/") {
 		storefront, albumId = parser.CheckUrlPlaylist(urlRaw)
+	} else if strings.Contains(urlRaw, "/station/") {
+		storefront, albumId = parser.CheckUrlStation(urlRaw)
+		isStation = true
 	} else {
 		storefront, albumId = parser.CheckUrl(urlRaw)
 	}
@@ -220,7 +226,11 @@ func processURL(urlRaw string, wg *sync.WaitGroup, semaphore chan struct{}, curr
 		return
 	}
 	var urlArg_i = parse.Query().Get("i")
-	err = downloader.Rip(albumId, storefront, urlArg_i, urlRaw, jsonOutput)
+	if isStation {
+		err = downloader.RipStation(albumId, storefront, urlRaw, jsonOutput)
+	} else {
+		err = downloader.Rip(albumId, storefront, urlArg_i, urlRaw, jsonOutput)
+	}
 
 	if err != nil {
 		errMsg := fmt.Sprintf("专辑下载失败: %s -> %v", urlRaw, err)
@@ -417,7 +427,7 @@ func main() {
 	if !jsonOutput {
 		fmt.Printf("\n=======  [✔ ] Completed: %d/%d  |  [⚠ ] Warnings: %d  |  [✖ ] Errors: %d  =======\n", core.Counter.Success, core.Counter.Total, core.Counter.Unavailable+core.Counter.NotSong, core.Counter.Error)
 		if core.Counter.Error > 0 {
-			fmt.Println("部分任务在执行过程中出错，请检查上面的日志记录")
+			fmt.Println("部分任务在执行过程中出错，请检查日志记录")
 		}
 	}
 }
