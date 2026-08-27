@@ -5,20 +5,16 @@
 # ----------------------------------------------------------------
 accounts:
   - name: "CN"           # 账号名称，方便识别
-    storefront: "cn"     # 账号所属区域 (必须小写, 如 cn, us, jp, hk)
-    media-user-token: ""
+    storefront: "cn"     # 账号所属区域 (必须小写, 必须小写,必须小写,如 cn, us, jp, hk)
+    
+    media-user-token: "your-media-token"
     authorization-token: "your-cn-auth-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
     
     decrypt-m3u8-port: "127.0.0.1:10020"
-    get-m3u8-port: "127.0.0.1:10021"
+    get-m3u8-port: "127.0.0.1:10021" # 获取m3u8端口不能负载均衡
     get-account-port: "127.0.0.1:10022"
     key-server: "127.0.0.1:10023"
-    # 建议 hires 才获取 m3u8
-    get-m3u8-mode: hires
-    # 开启外部解密
     template-decrypt: true
-    # hires音源开启获取m3u8
-    get-m3u8-from-device: true
     get-account-from-device: false
 # ----------------------------------------------------------------
 #  - name: "US"           # 账号名称，方便识别
@@ -26,16 +22,12 @@ accounts:
 #    media-user-token: "your-media-token"
 #    authorization-token: "your-authorization-token" # 可选，如果留空或为 "your-authorization-token"，程序会自动获取
 #    decrypt-m3u8-port: "127.0.0.1:20020"
-#    get-m3u8-port: "127.0.0.1:20021"
+#    get-m3u8-port: "127.0.0.1:20021"  # 获取m3u8端口不能负载均衡
 #    get-account-port: "127.0.0.1:20022"
 #    key-server: "127.0.0.1:20023"
-     # 建议 hires 获取 m3u8
-#    get-m3u8-mode: hires
     # 开启外部解密
 #    template-decrypt: true
-    # hires音源开启获取m3u8
-#    get-m3u8-from-device: true
-#    get-account-from-device: false
+#    get-account-from-device: false   #if set true,will auto get media-user-token
 # ----------------------------------------------------------------
 # 是否开启全区域解密
 # true: 使用所有配置的账号（CN, JP, US ...）解密
@@ -48,13 +40,13 @@ atmos-save-folder: "./music"
 # ----------------------------------------------------------------
 # 是否开启 CDN true 开启，false 关闭
 # 开启后, 将把音频 aod.itunes.apple.com 视频 mvod.itunes.apple.com 的流量重定向到下面指定的CDN
-enable-cdn-override: true
+enable-cdn-override: false
 # CDN IP
 # 台湾 17.253.117.201，17.253.117.202，17.253.117.203
 # 香港 17.253.85.201，17.253.85.202，17.253.85.203，17.253.85.204，17.253.85.205，17.253.85.206，17.253.87.195，17.253.87.196，17.253.87.201，17.253.87.203
 # 日本 17.253.69.200，17.253.69.202，17.253.75.201，17.253.75.202
-# 格式1：ip 为音视频通用，格式2：ip,ip 前面的为音频 CDN 逗号后面为视频 CDN，如：cdn-ip: "17.253.117.201,17.253.85.201"
-cdn-ip: "17.253.117.203"
+# 格式1：ip 为音视频通用，格式2：ip,ip 前面的为音频 CDN 逗号后面为视频 CDN，如：cdn-ip: "17.253.117.201,17.253.85.201"，"17.253.117.201,"为之开启音频CDN
+cdn-ip: "17.253.117.201,"
 # ----------------------------------------------------------------
 # Qobuz 账号配置 (用于获取PDF和专辑介绍)，尽量使用 fr 法区
 qobuz-username: "" # 你的 Qobuz 邮箱
@@ -75,7 +67,7 @@ lrc-format: "lrc"     # 可选: "lrc" 或 "ttml"
 embed-lrc: true       # 是否将歌词嵌入音频文件
 save-lrc-file: false  # 是否将歌词另存为 .lrc 文件
 # ---------------------------------------------------------------- 
-# 是否开启歌词翻译
+# 是否开启第三方歌词翻译
 enable-translation: false
 # 官方目标语言: zh-Hans-CN (简体), zh-Hant-TW (繁体), ja (日文), ko (韩文)
 translation-language: "zh-Hans-CN"
@@ -141,6 +133,7 @@ save-artist-cover: false        #歌手头像
 save-animated-artwork: false    # 需要 ffmpeg
 emby-animated-artwork: false    # 需要 ffmpeg
 # ---------------------------------------------------------------- 
+tag-itunes-id: true
 # M3U8 获取模式
 get-m3u8-from-device: true
 get-m3u8-mode: "hires"    # 可选: "all" (获取所有) 或 "hires" (仅探测Hi-Res)
