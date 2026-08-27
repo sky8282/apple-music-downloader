@@ -62,22 +62,35 @@ async function getAppleAuthToken(webContents) {
     }
     
     try {
-        const scriptSrc = await webContents.executeJavaScript(`
-            document.querySelector("script[type='module']")?.src;
+        const token = await webContents.executeJavaScript(`
+            (async () => {
+                try {
+                    if (window.MusicKit && window.MusicKit.config && window.MusicKit.config.developerToken) {
+                        return window.MusicKit.config.developerToken;
+                    }
+                    
+                    const scripts = Array.from(document.querySelectorAll('script'));
+                    const targetScript = scripts.find(s => s.src && s.src.includes('/assets/index'));
+                    
+                    if (targetScript) {
+                        const res = await fetch(targetScript.src);
+                        const text = await res.text();
+                        const match = text.match(/(eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+)/);
+                        if (match) return match[1];
+                    }
+                    return null;
+                } catch(e) { 
+                    return null; 
+                }
+            })();
         `);
 
-        if (!scriptSrc) {
-            console.log('[Main] 未找到 Token 脚本');
-            return null;
-        }
-
-        const text = await (await fetchNet(scriptSrc)).text();
-        const match = text.match(/"(eyJhbGciOiJ.+?)"/);
-        
-        if (match && match[1]) {
-            console.log('[Main] Apple Auth Token 已获取');
-            globalAppleAuthToken = match[1];
+        if (token) {
+            console.log('[Main] Apple Auth Token 已成功获取');
+            globalAppleAuthToken = token;
             return globalAppleAuthToken;
+        } else {
+            console.log('[Main] 未找到 Apple Auth Token');
         }
     } catch (e) {
         console.error('[Main] 获取 Apple Auth Token 失败:', e);
@@ -267,17 +280,36 @@ ipcMain.on('request-album-tracks-quality', async (event, albumId) => {
 
 function manageConfig() {
     try {
-        userConfigPath = path.join(app.getPath('userData'), 'config.yaml');
-        if (fs.existsSync(userConfigPath)) {
-            console.log(`[Main] 配置文件已存在: ${userConfigPath}`);
+        const isDev = !app.isPackaged;
+        let exeDir;
+
+        if (isDev) {
+            exeDir = __dirname;
+        } else {
+            if (process.platform === 'darwin') {
+                exeDir = path.join(app.getPath('exe'), '../../../..');
+            } else {
+                exeDir = path.dirname(app.getPath('exe'));
+            }
+        }
+
+        const localConfigPath = path.join(exeDir, 'config.yaml');
+        
+        if (fs.existsSync(localConfigPath)) {
+            userConfigPath = localConfigPath;
+            console.log(`[Main] 配置文件已存在 (同目录优先): ${userConfigPath}`);
             return;
         }
 
-        console.log(`[Main] 配置文件不存在, 正在创建...`);
-        
-        const isDev = !app.isPackaged;
-        let templateConfigPath;
+        userConfigPath = path.join(app.getPath('userData'), 'config.yaml');
+        if (fs.existsSync(userConfigPath)) {
+            console.log(`[Main] 配置文件已存在 (系统兜底目录): ${userConfigPath}`);
+            return;
+        }
 
+        console.log(`[Main] 配置文件均不存在, 正在往系统兜底目录创建...`);
+        
+        let templateConfigPath;
         if (isDev) {
             templateConfigPath = path.join(__dirname, 'config.yaml');
         } else {
