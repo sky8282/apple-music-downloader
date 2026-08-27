@@ -177,7 +177,7 @@ func LoadConfig(configPath string) error {
 		MaxPathLength = Config.MaxPathLength
 		useAutoDetect = false
 		fmt.Printf("%s : %s\n",
-			green("从配置文件强制使用最大路径长度限制"),
+			green("最大路径长度限制"),
 			red(fmt.Sprintf("%d", MaxPathLength)),
 		)
 	}
