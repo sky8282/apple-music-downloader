@@ -47,6 +47,7 @@ type ConfigSet struct {
 	LimitMax                int       `yaml:"limit-max"`
 	UseSongInfoForPlaylist  bool      `yaml:"use-songinfo-for-playlist"`
 	DlAlbumcoverForPlaylist bool      `yaml:"dl-albumcover-for-playlist"`
+	TagItunesID             bool      `yaml:"tag-itunes-id"`
 	MVAudioType             string    `yaml:"mv-audio-type"`
 	MVMax                   int       `yaml:"mv-max"`
 	AacDownloadThreads      int       `yaml:"aac_downloadthreads"`
@@ -590,5 +591,40 @@ type SongLyrics struct {
 	} `json:"data"`
 }
 
+type StationResp struct {
+	Href string            `json:"href"`
+	Next string            `json:"next"`
+	Data []StationRespData `json:"data"`
+}
 
+type StationAssets struct {
+	Results struct {
+		Assets []struct {
+			KeyServerUrl              string `json:"keyServerUrl"`
+			Url                       string `json:"url"`
+			WidevineKeyCertificateUrl string `json:"widevineKeyCertificateUrl"`
+			FairPlayKeyCertificateUrl string `json:"fairPlayKeyCertificateUrl"`
+		} `json:"assets"`
+	} `json:"results"`
+}
 
+type StationRespData struct {
+	ID         string `json:"id"`
+	Type       string `json:"type"`
+	Href       string `json:"href"`
+	Attributes struct {
+		Artwork struct {
+			Width  int    `json:"width"`
+			Height int    `json:"height"`
+			URL    string `json:"url"`
+		} `json:"artwork"`
+		IsLive bool   `json:"isLive"`
+		Name   string `json:"name"`
+		URL    string `json:"url"`
+		PlayParams struct {
+			ID          string `json:"id"`
+			Kind        string `json:"kind"`
+			StationHash string `json:"stationHash"`
+		} `json:"playParams"`
+	} `json:"attributes"`
+}
