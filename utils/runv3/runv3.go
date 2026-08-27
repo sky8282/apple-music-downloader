@@ -141,7 +141,7 @@ func BeforeRequest(cl *requests.Client, preCtx context.Context, method string, h
 	jsondata := map[string]interface{}{
 		"challenge":      base64.StdEncoding.EncodeToString(data.([]byte)),
 		"key-system":     "com.widevine.alpha",
-		"uri":            "data:;base64," + preCtx.Value("pssh").(string),
+		"uri":            preCtx.Value("uriPrefix").(string) + "," + preCtx.Value("pssh").(string),
 		"adamId":         preCtx.Value("adamId").(string),
 		"isLibrary":      false,
 		"user-initiated": true,
@@ -236,7 +236,43 @@ type Songlist struct {
 	Status int `json:"status"`
 }
 
+func fetchDynamicServerUrl(adamId, authtoken, mutoken string) string {
+	urlStr := "https://play.music.apple.com/WebObjects/MZPlay.woa/wa/webPlayback"
+	
+	keysToTry := []string{"radioStationId", "stationHash", "id", "salableAdamId"}
+	
+	for _, k := range keysToTry {
+		postData := map[string]string{
+			k: adamId,
+		}
+		jsonData, _ := json.Marshal(postData)
+		req, _ := http.NewRequest("POST", urlStr, bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", "https://music.apple.com")
+		req.Header.Set("Authorization", "Bearer " + authtoken)
+		req.Header.Set("x-apple-music-user-token", mutoken)
+		
+		resp, err := getHijackedClient().Do(req)
+		if err == nil {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			var obj Songlist
+			if json.Unmarshal(body, &obj) == nil {
+				if len(obj.List) > 0 && obj.List[0].Hlsurl != "" {
+					return obj.List[0].Hlsurl
+				}
+			}
+		}
+	}
+	
+	return ""
+}
+
 func extractKidBase64(b string, mvmode bool) (string, string, error) {
+    req, _ := http.NewRequest("GET", b, nil)
+    req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15")
+    req.Header.Set("Origin", "https://music.apple.com")
+    
 	resp, err := getHijackedClient().Get(b)
 	if err != nil {
 		return "", "", err
@@ -259,8 +295,7 @@ func extractKidBase64(b string, mvmode bool) (string, string, error) {
 	if listType == m3u8.MEDIA {
 		mediaPlaylist := from.(*m3u8.MediaPlaylist)
 		if mediaPlaylist.Key != nil {
-			split := strings.Split(mediaPlaylist.Key.URI, ",")
-			kidbase64 = split[1]
+			kidbase64 = mediaPlaylist.Key.URI
 			lastSlashIndex := strings.LastIndex(b, "/")
 			urlBuilder.WriteString(b[:lastSlashIndex])
 			urlBuilder.WriteString("/")
@@ -284,6 +319,10 @@ func extractKidBase64(b string, mvmode bool) (string, string, error) {
 	return kidbase64, urlBuilder.String(), nil
 }
 func extsong(b string) bytes.Buffer {
+    req, _ := http.NewRequest("GET", b, nil)
+    req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15")
+    req.Header.Set("Origin", "https://music.apple.com")
+    
 	resp, err := getHijackedClient().Get(b)
 	if err != nil {
 		fmt.Printf("下载文件失败: %v\n", err)
@@ -299,7 +338,7 @@ func extsong(b string) bytes.Buffer {
 		progressbar.OptionShowCount(),
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowBytes(true),
-		progressbar.OptionSetDescription("Downloading..."),
+		progressbar.OptionSetDescription("正在下载并解密..."),
 		progressbar.OptionSetTheme(progressbar.Theme{
 			Saucer:        "",
 			SaucerHead:    "",
@@ -312,7 +351,7 @@ func extsong(b string) bytes.Buffer {
 	return buffer
 }
 
-func Run(adamId string, trackpath string, authtoken string, mutoken string, mvmode bool) (string, error) {
+func Run(adamId string, trackpath string, authtoken string, mutoken string, mvmode bool, serverUrl string) (string, error) {
 	var keystr string
 	var fileurl string
 	var kidBase64 string
@@ -328,10 +367,21 @@ func Run(adamId string, trackpath string, authtoken string, mutoken string, mvmo
 			return "", err
 		}
 	}
+	splitURI := strings.Split(kidBase64, ",")
+	var uriPrefix, actualKid string
+	if len(splitURI) >= 2 {
+		uriPrefix = splitURI[0]
+		actualKid = splitURI[1]
+	} else {
+		uriPrefix = "data:;base64"
+		actualKid = kidBase64
+	}
+
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, "pssh", kidBase64)
+	ctx = context.WithValue(ctx, "pssh", actualKid)
+	ctx = context.WithValue(ctx, "uriPrefix", uriPrefix)
 	ctx = context.WithValue(ctx, "adamId", adamId)
-	pssh, err := getPSSH("", kidBase64)
+	pssh, err := getPSSH("", actualKid)
 	if err != nil {
 		fmt.Println(err)
 		return "", err
@@ -352,23 +402,29 @@ func Run(adamId string, trackpath string, authtoken string, mutoken string, mvmo
 	}
 	key.CdmInit()
 	var keybt []byte
-	if strings.Contains(adamId, "ra.") {
-		keystr, keybt, err = key.GetKey(ctx, "https://play.itunes.apple.com/WebObjects/MZPlay.woa/web/radio/versions/1/license", pssh, nil)
-		if err != nil {
-			fmt.Println(err)
-			return "", err
-		}
-	} else {
-		keystr, keybt, err = key.GetKey(ctx, "https://play.itunes.apple.com/WebObjects/MZPlay.woa/wa/acquireWebPlaybackLicense", pssh, nil)
-		if err != nil {
-			fmt.Println(err)
-			return "", err
+	
+	if serverUrl == "" {
+		serverUrl = "https://play.itunes.apple.com/WebObjects/MZPlay.woa/wa/acquireWebPlaybackLicense"
+	}
+	
+	if (strings.Contains(adamId, "ra.") || strings.HasPrefix(adamId, "station")) && serverUrl == "https://play.itunes.apple.com/WebObjects/MZPlay.woa/wa/acquireWebPlaybackLicense" {
+		dynamicUrl := fetchDynamicServerUrl(adamId, authtoken, mutoken)
+		if dynamicUrl != "" {
+			serverUrl = dynamicUrl
 		}
 	}
+
+	keystr, keybt, err = key.GetKey(ctx, serverUrl, pssh, nil)
+	if err != nil {
+		fmt.Println(err)
+		return "", err
+	}
+	
 	if mvmode {
 		keyAndUrls := "1:" + keystr + ";" + fileurl
 		return keyAndUrls, nil
 	}
+	
 	body := extsong(fileurl)
 	//fmt.Print("Downloaded\n")
 	var buffer bytes.Buffer
@@ -405,13 +461,17 @@ func downloadSegment(url string, index int, wg *sync.WaitGroup, segmentsChan cha
 		<-limiter
 		wg.Done()
 	}()
-
+	
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		fmt.Printf("错误(分段 %d): 创建请求失败: %v\n", index, err)
 		return
 	}
-
+    
+    // 【修复】：补全伪装头，防止 403 拦截
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15")
+    req.Header.Set("Origin", "https://music.apple.com")
+    
 	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Printf("错误(分段 %d): 下载失败: %v\n", index, err)
@@ -488,7 +548,7 @@ func ExtMvData(keyAndUrls string, savePath string) error {
 	const maxConcurrency = 15
 	limiter := make(chan struct{}, maxConcurrency)
 	client := getHijackedClient()
-	bar := progressbar.DefaultBytes(-1, "Downloading...")
+	bar := progressbar.DefaultBytes(-1, "正在下载并解密...")
 	barWriter := io.MultiWriter(tempFile, bar)
 	writerWg.Add(1)
 	go fileWriter(&writerWg, segmentsChan, barWriter, len(urls))
@@ -548,4 +608,75 @@ func DecryptMP4(r io.Reader, key []byte, w io.Writer) error {
 		}
 	}
 	return nil
+}
+
+func ResolveStationVariantPlaylist(masterURL string, authtoken string, mutoken string) (string, error) {
+	req, err := http.NewRequest("GET", masterURL, nil)
+	if err != nil {
+		return "", err
+	}
+	
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15")
+	req.Header.Set("Origin", "https://music.apple.com")
+	req.Header.Set("Referer", "https://music.apple.com/")
+	req.Header.Set("Accept", "application/vnd.apple.mpegurl,application/x-mpegURL,text/plain;q=0.8,*/*;q=0.5")
+	req.Header.Set("X-Apple-Store-Front", "143441-1,25")
+	
+	if mutoken != "" {
+		req.Header.Set("Media-User-Token", mutoken)
+		req.Header.Set("x-apple-music-user-token", mutoken)
+	}
+
+	resp, err := getHijackedClient().Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("请求变体列表失败，状态码: %d - %s", resp.StatusCode, resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	masterString := string(body)
+	from, listType, err := m3u8.DecodeFrom(strings.NewReader(masterString), true)
+	if err != nil {
+		return "", err
+	}
+	if listType != m3u8.MASTER {
+		return masterURL, nil
+	}
+
+	masterPlaylist := from.(*m3u8.MasterPlaylist)
+	var preferred string
+	for _, variant := range masterPlaylist.Variants {
+		if variant == nil {
+			continue
+		}
+		uri := variant.URI
+		if strings.Contains(uri, "256") && !strings.Contains(uri, "256_6") {
+			preferred = uri
+			break
+		}
+		if preferred == "" {
+			preferred = uri
+		}
+	}
+	
+	if preferred == "" {
+		return masterURL, nil
+	}
+	if strings.HasPrefix(preferred, "http") {
+		return preferred, nil
+	}
+	
+	lastSlashIndex := strings.LastIndex(masterURL, "/")
+	if lastSlashIndex == -1 {
+		return masterURL, nil
+	}
+	return masterURL[:lastSlashIndex+1] + preferred, nil
 }
