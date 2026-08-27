@@ -427,10 +427,14 @@
 
     let sidebarInjected = false;
 
+    let observerTimeout = null;
     const observer = new MutationObserver(() => {
-        try {
-            if (!document.getElementById(MAIN_BTN_CONTAINER_ID)) {
-                const albumHeader = document.querySelector(CONFIG.ALBUM_HEADER_ACTIONS + ':not(.custom-buttons-added)');
+        if (observerTimeout) clearTimeout(observerTimeout);
+        
+        observerTimeout = setTimeout(() => {
+            try {
+                if (!document.getElementById(MAIN_BTN_CONTAINER_ID)) {
+                    const albumHeader = document.querySelector(CONFIG.ALBUM_HEADER_ACTIONS + ':not(.custom-buttons-added)');
                 if (albumHeader) injectAlbumHeaderButton(albumHeader);
                 const artistHeaderBtn = document.querySelector(CONFIG.ARTIST_HEADER_PLAY_BTN + ':not(.custom-buttons-added)');
                 if (artistHeaderBtn) injectArtistHeaderButton(artistHeaderBtn);
@@ -460,11 +464,12 @@
                         wrapper.appendChild(qualityEl);
                     }
                 });
+                }
+                
+            } catch (err) {
+                console.error('[Injector.js] 注入时发生错误:', err);
             }
-            
-        } catch (err) {
-            console.error('[Injector.js] 注入时发生错误:', err);
-        }
+        }, 200); 
     });    
     observer.observe(document.body, { childList: true, subtree: true });
 
@@ -480,8 +485,13 @@
     });
     pathObserver.observe(document.body, { childList: true, subtree: true });
 
+    let navInjectInterval = null;
+
     function injectNavControls() {
-        if (document.getElementById('custom-nav-container')) return;
+        if (document.getElementById('custom-nav-container')) {
+            if (navInjectInterval) clearInterval(navInjectInterval);
+            return;
+        }
 
         const logoElement = document.querySelector('[data-testid="logo"]');
         if (!logoElement) return;
@@ -546,9 +556,11 @@
         navContainer.appendChild(createNavBtn(iconFwd, '前进', () => window.desktopApp.navigateFwd()));
         navContainer.appendChild(createNavBtn(iconRefresh, '刷新', () => window.desktopApp.refreshPage()));
         logoElement.appendChild(navContainer);
+        
+        if (navInjectInterval) clearInterval(navInjectInterval);
     }
     
-    setInterval(injectNavControls, 1000);
+    navInjectInterval = setInterval(injectNavControls, 1000);
 
     console.log('Apple Music 助手已加载');
 })();
