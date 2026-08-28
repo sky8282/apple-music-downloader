@@ -1,11 +1,13 @@
 {
   "name": "apple-music-desktop",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Apple Music Downloader",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --dir"
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac --arm64 --dir",
+    "build:win": "electron-builder --win --x64 && rm -rf dist/win-unpacked && rm -f dist/builder-debug.yml dist/builder-effective-config.yaml dist/*.blockmap && mkdir -p dist/win-x64 && mv dist/*.exe dist/win-x64/"
   },
   "dependencies": {},
   "devDependencies": {
@@ -34,51 +36,33 @@
       "target": "dir",
       "icon": "AppIcon.icns",
       "extraResources": [
-        {
-          "from": "./downloader",
-          "to": "./downloader"
-        },
-        {
-          "from": "./ffmpeg",
-          "to": "./ffmpeg"
-        },
-        {
-          "from": "./MP4Box",
-          "to": "./MP4Box"
-        },
-        {
-          "from": "./mp4decrypt",
-          "to": "./mp4decrypt"
-        },
-        {
-          "from": "./config.yaml",
-          "to": "./config.yaml"
+        { "from": "./downloader", "to": "./downloader" },
+        { "from": "./bin/mac-arm/ffmpeg", "to": "./ffmpeg" },
+        { "from": "./bin/mac-arm/mp4box", "to": "./mp4box" },
+        { "from": "./bin/mac-arm/mp4decrypt", "to": "./mp4decrypt" },
+        { "from": "./bin/mac-arm/libgpac.dylib", "to": "./libgpac.dylib" },
+        { "from": "./bin/mac-arm/gm_validator.dylib", "to": "./gm_validator.dylib" }
+      ],
+      "extraFiles": [
+        { 
+          "from": "./config.yaml", 
+          "to": "../../config.yaml" 
         }
       ]
     },
     "win": {
-      "target": "dir",
+      "target": "nsis",
       "icon": "AppIcon.ico",
       "extraResources": [
-        {
-          "from": "./downloader.exe",
-          "to": "./downloader.exe"
-        },
-        {
-          "from": "./ffmpeg.exe",
-          "to": "./ffmpeg.exe"
-        },
-        {
-          "from": "./MP4Box.exe",
-          "to": "./MP4Box.exe"
-        },
-        {
-          "from": "./mp4decrypt.exe",
-          "to": "./mp4decrypt.exe"
-        },
-        {
-          "from": "./config.yaml",
-          "to": "./config.yaml"
+        { "from": "./downloader.exe", "to": "./downloader.exe" },
+        { "from": "./bin/win-x64/ffmpeg.exe", "to": "./ffmpeg.exe" },
+        { "from": "./bin/win-x64/mp4box.exe", "to": "./mp4box.exe" },
+        { "from": "./bin/win-x64/mp4decrypt.exe", "to": "./mp4decrypt.exe" }
+      ],
+      "extraFiles": [
+        { 
+          "from": "./config.yaml", 
+          "to": "config.yaml" 
         }
       ]
     },
@@ -86,25 +70,15 @@
       "target": "dir",
       "icon": "AppIcon.png",
       "extraResources": [
-        {
-          "from": "./downloader",
-          "to": "./downloader"
-        },
-        {
-          "from": "./ffmpeg",
-          "to": "./ffmpeg"
-        },
-        {
-          "from": "./MP4Box",
-          "to": "./MP4Box"
-        },
-        {
-          "from": "./mp4decrypt",
-          "to": "./mp4decrypt"
-        },
-        {
-          "from": "./config.yaml",
-          "to": "./config.yaml"
+        { "from": "./downloader", "to": "./downloader" },
+        { "from": "./ffmpeg", "to": "./ffmpeg" },
+        { "from": "./MP4Box", "to": "./MP4Box" },
+        { "from": "./mp4decrypt", "to": "./mp4decrypt" }
+      ],
+      "extraFiles": [
+        { 
+          "from": "./config.yaml", 
+          "to": "config.yaml" 
         }
       ]
     }
