@@ -166,10 +166,16 @@
     `);
     const ku=ko("检查曲目音质",rT);
     
+    let lastKuClickTime = 0;
+
     function injectSidebarButtons() {
         Hu.addEventListener("click",()=>{const t=document.querySelector(".headings__subtitles > a"),e=document.querySelector(".headings__title");if(!e)return;const n=t==null?void 0:t.innerText.trim(),r=e.innerText.trim().replace(/ - Single$/i,"").replace(/ - EP$/i,""),i=new URLSearchParams;n&&i.set("artist",n),i.set("album",r),open(`https://covers.musichoarders.xyz?${i}`,"_blank")});
         Wp.addEventListener("click",()=>{open(`https://seed.musichoarders.xyz?identifier=${encodeURIComponent(location.href)}`,"_blank")});
         ku.addEventListener("click", () => {
+            const now = Date.now();
+            if (now - lastKuClickTime < 60000) return; // 60000 毫秒（1分钟）内只能点击一次
+            lastKuClickTime = now;
+
             const trackList = document.querySelector('[data-testid="track-list-item"]');
             if (trackList) {
                 const pathParts = window.location.pathname.split('/');
