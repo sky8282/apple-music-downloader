@@ -21,9 +21,27 @@ let taskDataStore = {};
 let queueLength = 0;
 let clearTaskTimer = null; 
 let currentAlbumTotalTracks = 0;
+const regionInput = document.getElementById('region-input');
 
-const MUSIC_URL = 'https://music.apple.com/cn/new';
-const CLASSICAL_URL = 'https://classical.music.apple.com/cn';
+function getCurrentRegion() {
+    return (regionInput.value || 'cn').trim().toLowerCase();
+}
+
+regionInput.addEventListener('keydown', (e) => {
+    if (e.isComposing || e.keyCode === 229) {
+        return;
+    }
+    
+    if (e.key === 'Enter') {
+        const region = getCurrentRegion();
+        if (btnServiceClassical.classList.contains('active')) {
+            window.desktopApp.switchService(`https://classical.music.apple.com/${region}`);
+        } else {
+            window.desktopApp.switchService(`https://music.apple.com/${region}/new`);
+        }
+        regionInput.blur(); 
+    }
+});
 
 minimizeButton.addEventListener('click', () => {
     taskBar.classList.add('collapsed');
@@ -40,11 +58,14 @@ queueButton.addEventListener('click', () => {
 });
 
 btnServiceMusic.addEventListener('click', () => {
-    window.desktopApp.switchService(MUSIC_URL);
+    const region = getCurrentRegion();
+    window.desktopApp.switchService(`https://music.apple.com/${region}/new`);
 });
 btnServiceClassical.addEventListener('click', () => {
-    window.desktopApp.switchService(CLASSICAL_URL);
+    const region = getCurrentRegion();
+    window.desktopApp.switchService(`https://classical.music.apple.com/${region}`);
 });
+
 btnEditConfig.addEventListener('click', () => {
     window.desktopApp.openConfig();
 });
@@ -76,8 +97,8 @@ window.desktopApp.onSetTaskbarState((isMinimized) => {
 
 window.desktopApp.onSetActiveService((url) => {
     if (!btnServiceMusic || !btnServiceClassical) return; 
-    btnServiceMusic.classList.toggle('active', url.startsWith(MUSIC_URL));
-    btnServiceClassical.classList.toggle('active', url.startsWith(CLASSICAL_URL));
+    btnServiceMusic.classList.toggle('active', url.startsWith('https://music.apple.com/'));
+    btnServiceClassical.classList.toggle('active', url.startsWith('https://classical.music.apple.com/'));
 });
 
 window.desktopApp.onSetQueueLength((length) => {
