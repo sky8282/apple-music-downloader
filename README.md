@@ -63,7 +63,7 @@ npm install -g electron
 ```
 * 打包 UI 程序
 ```text
-npm run build
+npm run build:mac 或 npm run build:win
 ```
         
 ![2](https://github.com/user-attachments/assets/443344b5-c61d-4656-a3ae-6bb7a5062e14)
